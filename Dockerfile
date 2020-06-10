@@ -30,10 +30,11 @@ RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin/kubectl
 
-COPY getconfig.sh   /usr/bin/quortex/getconfig
-COPY pushconfig.sh  /usr/bin/quortex/pushconfig
-COPY update_segmenter.py /usr/bin/quortex/update_segmenter
+COPY getconfig.sh         /usr/bin/quortex/getconfig
+COPY pushconfig.sh        /usr/bin/quortex/pushconfig
+COPY update_segmenter.py  /usr/bin/quortex/update_segmenter
+
 ENV PATH=$PATH:/usr/bin/quortex/
 
 RUN env
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT []
