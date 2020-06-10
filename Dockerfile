@@ -22,6 +22,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 # AWS cli install
 RUN pip3 install awscli==${AWSCLI_VERSION}
 
+# Python dependencies
+RUN pip3 install kubernetes==11.0.0
+
 # kubectl install
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
 RUN chmod +x ./kubectl
@@ -29,6 +32,7 @@ RUN mv ./kubectl /usr/local/bin/kubectl
 
 COPY getconfig.sh   /usr/bin/quortex/getconfig
 COPY pushconfig.sh  /usr/bin/quortex/pushconfig
+COPY update_segmenter.py /usr/bin/quortex/update_segmenter
 ENV PATH=$PATH:/usr/bin/quortex/
 
 RUN env

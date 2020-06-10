@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 import argparse
 import ast
 import asyncio
@@ -7,8 +7,6 @@ import json
 import os
 import sys
 from copy import deepcopy
-from datetime import datetime
-from pprint import pprint
 
 from kubernetes import client, config
 
@@ -500,7 +498,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load current kube config
-    config.load_kube_config()
+    try:
+        config.load_kube_config()
+    except config.config_exception.ConfigException:
+        print("Missing kube config file")
+        sys.exit(-1)
 
     # If upgrade is enable, version is mandatory
     if args.version == "" and args.upgrade:
