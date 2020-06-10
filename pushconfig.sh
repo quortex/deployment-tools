@@ -376,7 +376,6 @@ function update_configuration() {
             continue
         fi
 
-        service=$(cat "${configfile}" | jq .)   # Content of the configuration to be applied
         filename=$(basename -- "${configfile}") # Name of the file, without repertory
         output_name="${filename%.*}"            # remove the .json file extension
         service="${output_name%%_*}"            # service name is the 1st part of the filename, before "_"
