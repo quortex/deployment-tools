@@ -1,18 +1,28 @@
 FROM debian:buster
 
 ARG AWSCLI_VERSION=1.18.17
+ARG AZURECLI_VERSION=2.7.0-1
 ARG CLOUD_SDK_VERSION=295.0.0
+ARG HELM_VERSION=v3.2.2
+ARG HELM_DIFF_VERSION=v3.1.1
+ARG KOPS_VERSION=v1.17.0
 ARG KUBECTL_VERSION=v1.18.3
+ARG TERRAFORM_VERSION=0.12.26
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
   apt-transport-https \
   ca-certificates \
+  curl \
   gettext \
+  git \
   gnupg \
   jq \
+  lsb-release \
   python3 \
-  python3-pip
+  python3-pip \
+  wget \
+  unzip
 
 # Google Cloud SDK install
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
@@ -22,6 +32,11 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 # AWS cli install
 RUN pip3 install awscli==${AWSCLI_VERSION}
 
+# Azure cli install
+RUN echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/azure-cli.list && \
+  curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null && \
+  apt-get update && apt-get install -y azure-cli=${AZURECLI_VERSION}~$(lsb_release -cs)
+
 # Python dependencies
 RUN pip3 install kubernetes==11.0.0
 
@@ -30,11 +45,29 @@ RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL
 RUN chmod +x ./kubectl
 RUN mv ./kubectl /usr/local/bin/kubectl
 
+# KOPS install
+RUN curl -Lo kops https://github.com/kubernetes/kops/releases/download/${KOPS_VERSION}/kops-linux-amd64
+RUN chmod +x ./kops
+RUN mv ./kops /usr/local/bin/
+
+# terraform install
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+RUN unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+RUN mv ./terraform /usr/local/bin/
+
+# helm install
+RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz
+RUN tar -zxvf helm-${HELM_VERSION}-linux-amd64.tar.gz && rm helm-${HELM_VERSION}-linux-amd64.tar.gz
+RUN mv linux-amd64/helm /usr/local/bin/helm
+
+# helm plugins install
+RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
+
+
 COPY getconfig.sh         /usr/bin/quortex/getconfig
 COPY pushconfig.sh        /usr/bin/quortex/pushconfig
 COPY update_segmenter.py  /usr/bin/quortex/update_segmenter
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
-RUN env
 ENTRYPOINT []
