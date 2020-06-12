@@ -41,24 +41,26 @@ RUN echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb
 RUN pip3 install kubernetes==11.0.0
 
 # kubectl install
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
-RUN chmod +x ./kubectl
-RUN mv ./kubectl /usr/local/bin/kubectl
+RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
+  chmod +x ./kubectl && \
+  mv ./kubectl /usr/local/bin/kubectl
 
 # KOPS install
-RUN curl -Lo kops https://github.com/kubernetes/kops/releases/download/${KOPS_VERSION}/kops-linux-amd64
-RUN chmod +x ./kops
-RUN mv ./kops /usr/local/bin/
+RUN curl -Lo kops https://github.com/kubernetes/kops/releases/download/${KOPS_VERSION}/kops-linux-amd64 && \
+  chmod +x ./kops && \
+  mv ./kops /usr/local/bin/
 
 # terraform install
-RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-RUN unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-RUN mv ./terraform /usr/local/bin/
+RUN wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
+  unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
+  rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
+  mv ./terraform /usr/local/bin/
 
 # helm install
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz
-RUN tar -zxvf helm-${HELM_VERSION}-linux-amd64.tar.gz && rm helm-${HELM_VERSION}-linux-amd64.tar.gz
-RUN mv linux-amd64/helm /usr/local/bin/helm
+RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+  tar -zxvf helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+  rm helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+  mv linux-amd64/helm /usr/local/bin/helm
 
 # helm plugins install
 RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
@@ -66,7 +68,7 @@ RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_
 
 COPY getconfig.sh         /usr/bin/quortex/getconfig
 COPY pushconfig.sh        /usr/bin/quortex/pushconfig
-COPY update_segmenter.py  /usr/bin/quortex/update_segmenter
+COPY update_segmenter.py  /usr/bin/quortex/updatesegmenter
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
