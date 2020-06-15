@@ -4,7 +4,7 @@ A toolkit repo for Quortex deployment.
 
 ## Configuration Scripts
 
-The scripts `pushconfig.sh` and `getconfig.sh` are made to push and retrieve configurations in bulk from and to the Quortex workflow. 
+The scripts `pushconfig.sh` and `getconfig.sh` are made to push and retrieve configurations in bulk from and to the Quortex workflow.
 
 ### File format
 
@@ -30,5 +30,54 @@ These files should  also follow a strict JSON format :
 
 ### API
 
-Both can be used with the **Kubernetes API** or with the **external API**. By default, they use the kubernetes API, to use the external use the options `-A 
+Both can be used with the **Kubernetes API** or with the **external API**. By default, they use the kubernetes API, to use the external use the options `-A
 api.mycluster.com -u myuser:mypassword`.
+
+## Update scripts
+
+The script update_segmenter.py allows the massive update of segmenters unit.
+
+By default, the script does a "dry-run" of the update process. Use the "--upgrade" argument to actually run the update.
+
+In addition, using the "--display" argument, the script acts as a monitoring tool to visualize the list of segmenters currently running, and the version that each segmenter is running. It is useful to oversee the ongoing upgrade.
+
+### Dependencies
+
+The script update_segmenter.py requires following dependencies:
+- asyncio
+- kubernetes
+
+```
+#pip3 install asyncio kubernetes
+```
+
+### Usage
+
+- -h --help: Show this help message
+- -v VERSION, --version VERSION: The new segmenter version to update
+- -n NAME, --name NAME: Specify the basename of the segmenters
+- -d, --display: Display ongoing update
+- -u, --upgrade: Do upgrade
+- -o, --overbandwidth: Allow overbandwidth for mono segmenter
+- -p, --parallel: Allow parallel update of segmenters
+- -g GROUP [GROUP ...], --group GROUP [GROUP ...]: Specify the list of group to update
+
+### Example
+
+Show the current running version:
+
+```
+$./update_segmenter.py --display
+```
+
+Upgrade the version of units sequentially:
+
+```
+$./update_segmenter.py --display --upgrade --version rel-x.x.x
+```
+
+Upgrade the version of units in parallel and allow over bandwidth consumption:
+
+```
+$./update_segmenter.py --display --upgrade --parallel --version rel-x.x.x --overbandwidth
+```
