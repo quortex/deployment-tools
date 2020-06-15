@@ -37,6 +37,10 @@ api.mycluster.com -u myuser:mypassword`.
 
 The script update_segmenter.py allows the massive update of segmenters unit.
 
+By default, the script does a "dry-run" of the update process. Use the "--upgrade" argument to actually run the update.
+
+In addition, using the "--display" argument, the script acts as a monitoring tool to visualize the list of segmenters currently running, and the version that each segmenter is running. It is useful to oversee the ongoing upgrade.
+
 ### Dependencies
 
 The script update_segmenter.py requires following dependencies:

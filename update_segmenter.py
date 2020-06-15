@@ -352,13 +352,6 @@ async def put_deployment_version(deployment,newversion):
             if  podready != "1/1" and podready != "2/2":
                 ready = False
 
-            # # Accelerate termination by sending die signal
-            # if get_pod_status(pod) == "Terminating":
-            #     if podready == "1/1" or podready == "2/2":
-            #         if pod.metadata.name not in died:
-            #             died.append(pod.metadata.name)
-            #             send_die_to_pod(pod)
-
         await asyncio.sleep(1)
 
 def put_ainode_conf(conf):
@@ -416,11 +409,6 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     else:
         notused = True
 
-    # NOT NEEDED
-    # # Decativate conf in ainode
-    # for conf in newconfs:
-    #     put_ainode_conf(conf)
-
     # Set replicas to zero to avoid overbandwith consumption
     # Conditions one of following:
     # 1: overbandwidth is not allowed
@@ -436,11 +424,6 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     # Reset replicas to nominal value
     if overbw is False or nbupstream != 1 or notused is True:
         await put_deployment_replicas(deployment,nbreplicas)
-
-    # NOT NEEDED
-    # # Reactivate conf in ainode
-    # for conf in modifiedconfs:
-    #     put_ainode_conf(conf)
 
     await asyncio.sleep(1)
 
@@ -527,7 +510,7 @@ if __name__ == '__main__':
         futures.append(interract(name=args.name, window=window, newversion=args.version))
         futures.append(display_status(name=args.name, window=window, newversion=args.version))
 
-    # If display enable, add upgrade coroutine
+    # If upgrade enabled, add upgrade coroutine
     if args.upgrade:
         futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel))
 
