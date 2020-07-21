@@ -7,7 +7,7 @@
 
 FOLDER=""
 SCHEME="https"
-APPLY="backend,ainode"
+APPLY="backend,ainode,unit"
 VERSION="3.1.0"
 NO_DRY_RUN=true
 PRINT_SUBST=true
