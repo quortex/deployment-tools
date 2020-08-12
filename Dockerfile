@@ -76,8 +76,9 @@ RUN mv ./istio-${ISTIO_VERSION}/bin/* /usr/local/bin/
 RUN pip3 install yq==${YQ_VERSION}
 
 # jsonnet install
-RUN wget https://github.com/google/jsonnet/releases/download/${JSONNET_VERSION}/jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz 
-RUN tar xzf jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz -C /usr/local/bin/ jsonnet
+RUN wget https://github.com/google/jsonnet/releases/download/${JSONNET_VERSION}/jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz \
+  && tar xzf jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz -C /usr/local/bin/ jsonnet \
+  && rm jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz
 
 COPY getconfig.sh         /usr/bin/quortex/getconfig
 COPY pushconfig.sh        /usr/bin/quortex/pushconfig
