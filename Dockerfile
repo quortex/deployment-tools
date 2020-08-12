@@ -9,6 +9,7 @@ ARG KOPS_VERSION=v1.17.0
 ARG KUBECTL_VERSION=v1.18.3
 ARG TERRAFORM_VERSION=0.12.28
 ARG ISTIO_VERSION=1.6.4
+ARG YQ_VERSION=2.10.1
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
@@ -69,6 +70,9 @@ RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_
 # Istioctl install
 RUN curl -L https://istio.io/downloadIstio | sh -
 RUN mv ./istio-${ISTIO_VERSION}/bin/* /usr/local/bin/
+
+# yq install
+RUN pip3 install yq==${YQ_VERSION}
 
 COPY getconfig.sh         /usr/bin/quortex/getconfig
 COPY pushconfig.sh        /usr/bin/quortex/pushconfig
