@@ -7,9 +7,10 @@ ARG HELM_VERSION=v3.2.2
 ARG HELM_DIFF_VERSION=v3.1.1
 ARG KOPS_VERSION=v1.17.0
 ARG KUBECTL_VERSION=v1.18.3
-ARG TERRAFORM_VERSION=0.12.28
+ARG TERRAFORM_VERSION=0.12.29
 ARG ISTIO_VERSION=1.6.4
 ARG YQ_VERSION=2.10.1
+ARG JSONNET_VERSION=v0.16.0
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
@@ -73,6 +74,10 @@ RUN mv ./istio-${ISTIO_VERSION}/bin/* /usr/local/bin/
 
 # yq install
 RUN pip3 install yq==${YQ_VERSION}
+
+# jsonnet install
+RUN wget https://github.com/google/jsonnet/releases/download/${JSONNET_VERSION}/jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz 
+RUN tar xzf jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz -C /usr/local/bin/ jsonnet
 
 COPY getconfig.sh         /usr/bin/quortex/getconfig
 COPY pushconfig.sh        /usr/bin/quortex/pushconfig
