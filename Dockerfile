@@ -1,4 +1,5 @@
-FROM debian:buster
+FROM debian:bullseye
+# Note: "bullseye" is currently the "testing" version of debian, it is not considered stable...
 
 ARG AWSCLI_VERSION=1.18.17
 ARG AZURECLI_VERSION=2.7.0-1
@@ -10,6 +11,7 @@ ARG KUBECTL_VERSION=v1.18.3
 ARG TERRAFORM_VERSION=0.12.28
 ARG ISTIO_VERSION=1.6.4
 ARG YQ_VERSION=2.10.1
+ARG JSONNET_VERSION=0.16.0
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
@@ -20,6 +22,7 @@ RUN apt-get update && apt-get install -y \
   git \
   gnupg \
   jq \
+  jsonnet \
   lsb-release \
   python3 \
   python3-pip \
@@ -35,9 +38,11 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 RUN pip3 install awscli==${AWSCLI_VERSION}
 
 # Azure cli install
-RUN echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/azure-cli.list && \
+# Note: we force the download of the package for the older Debian "buster" instead of "bullseye" (that would be returned by `lsb_release -cs`),
+# because it is not currently available for this debian release
+RUN echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ buster main" | tee /etc/apt/sources.list.d/azure-cli.list && \
   curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null && \
-  apt-get update && apt-get install -y azure-cli=${AZURECLI_VERSION}~$(lsb_release -cs)
+  apt-get update && apt-get install -y azure-cli=${AZURECLI_VERSION}~buster
 
 # Python dependencies
 RUN pip3 install kubernetes==11.0.0
