@@ -80,9 +80,10 @@ RUN wget https://github.com/google/jsonnet/releases/download/${JSONNET_VERSION}/
   && tar xzf jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz -C /usr/local/bin/ jsonnet \
   && rm jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz
 
-COPY getconfig.sh         /usr/bin/quortex/getconfig
-COPY pushconfig.sh        /usr/bin/quortex/pushconfig
-COPY update_segmenter.py  /usr/bin/quortex/updatesegmenter
+COPY getconfig.sh                               /usr/bin/quortex/getconfig
+COPY pushconfig.sh                              /usr/bin/quortex/pushconfig
+COPY update_segmenter.py                        /usr/bin/quortex/updatesegmenter
+COPY enable_distribution_additional_metrics.py  /usr/bin/quortex/enable_distribution_additional_metrics.py
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
