@@ -8,7 +8,7 @@ ARG HELM_DIFF_VERSION=v3.1.1
 ARG KOPS_VERSION=v1.17.0
 ARG KUBECTL_VERSION=v1.18.3
 ARG TERRAFORM_VERSION=0.12.29
-ARG ISTIO_VERSION=1.6.4
+ARG ISTIOCTL_VERSION=1.6.4
 ARG YQ_VERSION=2.10.1
 ARG JSONNET_VERSION=v0.16.0
 
@@ -69,8 +69,10 @@ RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
 RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
 
 # Istioctl install
-RUN curl -L https://istio.io/downloadIstio | sh -
-RUN mv ./istio-${ISTIO_VERSION}/bin/* /usr/local/bin/
+RUN curl -fsLO https://github.com/istio/istio/releases/download/${ISTIOCTL_VERSION}/istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  tar -zxvf istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  rm istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  mv ./istioctl /usr/local/bin/
 
 # yq install
 RUN pip3 install yq==${YQ_VERSION}
