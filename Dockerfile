@@ -5,12 +5,13 @@ ARG AZURECLI_VERSION=2.7.0-1
 ARG CLOUD_SDK_VERSION=295.0.0
 ARG HELM_VERSION=v3.2.2
 ARG HELM_DIFF_VERSION=v3.1.1
+ARG ISTIOCTL_VERSION=1.6.4
+ARG JSONNET_VERSION=v0.16.0
 ARG KOPS_VERSION=v1.17.0
 ARG KUBECTL_VERSION=v1.18.3
+ARG KUSTOMIZE_VERSION=v3.8.1
 ARG TERRAFORM_VERSION=0.12.29
-ARG ISTIO_VERSION=1.6.4
 ARG YQ_VERSION=2.10.1
-ARG JSONNET_VERSION=v0.16.0
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
@@ -69,8 +70,10 @@ RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
 RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
 
 # Istioctl install
-RUN curl -L https://istio.io/downloadIstio | sh -
-RUN mv ./istio-${ISTIO_VERSION}/bin/* /usr/local/bin/
+RUN curl -fsLO https://github.com/istio/istio/releases/download/${ISTIOCTL_VERSION}/istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  tar -zxvf istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  rm istioctl-${ISTIOCTL_VERSION}-linux-amd64.tar.gz && \
+  mv ./istioctl /usr/local/bin/
 
 # yq install
 RUN pip3 install yq==${YQ_VERSION}
@@ -80,9 +83,16 @@ RUN wget https://github.com/google/jsonnet/releases/download/${JSONNET_VERSION}/
   && tar xzf jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz -C /usr/local/bin/ jsonnet \
   && rm jsonnet-bin-${JSONNET_VERSION}-linux.tar.gz
 
-COPY getconfig.sh         /usr/bin/quortex/getconfig
-COPY pushconfig.sh        /usr/bin/quortex/pushconfig
-COPY update_segmenter.py  /usr/bin/quortex/updatesegmenter
+# kustomize install
+RUN curl -fsLO https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz && \
+  tar -zxvf kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz && \
+  rm kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz && \
+  mv ./kustomize /usr/local/bin/
+
+COPY getconfig.sh                               /usr/bin/quortex/getconfig
+COPY pushconfig.sh                              /usr/bin/quortex/pushconfig
+COPY update_segmenter.py                        /usr/bin/quortex/updatesegmenter
+COPY enable_distribution_additional_metrics.py  /usr/bin/quortex/enable_distribution_additional_metrics.py
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
