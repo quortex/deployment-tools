@@ -172,24 +172,72 @@ def render(name, status, window, newversion):
     update_sizing(window)
     baseline = BASELINE_OFFSET
     if baseline >= 0:
-        window.addstr(baseline, GROUPID_COLUMN_START,   "GROUPID")
-        window.addstr(baseline, ID_COLUMN_START,        "ID")
-        window.addstr(baseline, DEP_COLUMN_START,       "DEPLOYMENT")
-        window.addstr(baseline, INUSE_COLUMN_START,     "INUSE")
-        window.addstr(baseline, POD_COLUMN_START,       "POD")
-        window.addstr(baseline, VERSION_COLUMN_START,   "VERSION")
-        window.addstr(baseline, READY_COLUMN_START,     "READY")
-        window.addstr(baseline, STATUS_COLUMN_START,    "STATUS")
+        try:
+            window.addstr(baseline, GROUPID_COLUMN_START,   "GROUPID")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, ID_COLUMN_START,        "ID")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, DEP_COLUMN_START,       "DEPLOYMENT")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, INUSE_COLUMN_START,     "INUSE")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, POD_COLUMN_START,       "POD")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, VERSION_COLUMN_START,   "VERSION")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, READY_COLUMN_START,     "READY")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, STATUS_COLUMN_START,    "STATUS")
+        except curses.error:
+            pass
     baseline += 1
     if baseline >= 0:
-        window.addstr(baseline, GROUPID_COLUMN_START,   "-------")
-        window.addstr(baseline, ID_COLUMN_START,        "--")
-        window.addstr(baseline, DEP_COLUMN_START,       "----------")
-        window.addstr(baseline, INUSE_COLUMN_START,     "-----")
-        window.addstr(baseline, POD_COLUMN_START,       "---")
-        window.addstr(baseline, VERSION_COLUMN_START,   "-------")
-        window.addstr(baseline, READY_COLUMN_START,     "-----")
-        window.addstr(baseline, STATUS_COLUMN_START,    "------")
+        try:
+            window.addstr(baseline, GROUPID_COLUMN_START,   "-------")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, ID_COLUMN_START,        "--")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, DEP_COLUMN_START,       "----------")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, INUSE_COLUMN_START,     "-----")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, POD_COLUMN_START,       "---")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, VERSION_COLUMN_START,   "-------")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, READY_COLUMN_START,     "-----")
+        except curses.error:
+            pass
+        try:
+            window.addstr(baseline, STATUS_COLUMN_START,    "------")
+        except curses.error:
+            pass
 
     for group, value1 in status.items():
         for dep, value2 in value1["deployments"].items():
@@ -200,34 +248,75 @@ def render(name, status, window, newversion):
                     groupid = groupid.split(f"{name}-",1)[-1]
                     podid = dep.split(f"{name}-{groupid}-",1)[-1]
                     podid = podid.split("-",1)[0]
-                    window.addstr(baseline, GROUPID_COLUMN_START, groupid)
-                    window.addstr(baseline, ID_COLUMN_START, podid)
-                    window.addstr(baseline, DEP_COLUMN_START, dep)
+                    try:
+                        window.addstr(baseline, GROUPID_COLUMN_START, groupid)
+                    except curses.error:
+                        pass
+                    try:
+                        window.addstr(baseline, ID_COLUMN_START, podid)
+                    except curses.error:
+                        pass
+                    try:
+                        window.addstr(baseline, DEP_COLUMN_START, dep)
+                    except curses.error:
+                        pass
 
                     if value2['inuse'] == "yes":
-                        window.addstr(baseline, INUSE_COLUMN_START, value2['inuse'], curses.color_pair(3))
+                        try:
+                            window.addstr(baseline, INUSE_COLUMN_START, value2['inuse'], curses.color_pair(3))
+                        except curses.error:
+                            pass
                     else:
-                        window.addstr(baseline, INUSE_COLUMN_START, value2['inuse'], curses.color_pair(1))
-
-                    window.addstr(baseline, POD_COLUMN_START, pod)
+                        try:
+                            window.addstr(baseline, INUSE_COLUMN_START, value2['inuse'], curses.color_pair(1))
+                        except curses.error:
+                            pass
+                    try:
+                        window.addstr(baseline, POD_COLUMN_START, pod)
+                    except curses.error:
+                        pass
                     if newversion == "":
-                        window.addstr(baseline, VERSION_COLUMN_START, value3['version'])
+                        try:
+                            window.addstr(baseline, VERSION_COLUMN_START, value3['version'])
+                        except curses.error:
+                            pass
                     elif newversion == value3['version']:
-                        window.addstr(baseline, VERSION_COLUMN_START, value3['version'], curses.color_pair(3))
+                        try:
+                            window.addstr(baseline, VERSION_COLUMN_START, value3['version'], curses.color_pair(3))
+                        except curses.error:
+                            pass
                     else:
-                        window.addstr(baseline, VERSION_COLUMN_START, value3['version'], curses.color_pair(1))
+                        try:
+                            window.addstr(baseline, VERSION_COLUMN_START, value3['version'], curses.color_pair(1))
+                        except curses.error:
+                            pass
 
                     if value3['ready'] == "1/1" or value3['ready'] == "2/2":
-                        window.addstr(baseline, READY_COLUMN_START, value3['ready'], curses.color_pair(3))
+                        try:
+                            window.addstr(baseline, READY_COLUMN_START, value3['ready'], curses.color_pair(3))
+                        except curses.error:
+                            pass
                     else:
-                        window.addstr(baseline, READY_COLUMN_START, value3['ready'], curses.color_pair(2))
+                        try:
+                            window.addstr(baseline, READY_COLUMN_START, value3['ready'], curses.color_pair(2))
+                        except curses.error:
+                            pass
 
                     if value3['status'] == "Running":
-                        window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(3))
+                        try:
+                            window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(3))
+                        except curses.error:
+                            pass
                     elif value3['status'] == "Pending":
-                        window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(2))
+                        try:
+                            window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(2))
+                        except curses.error:
+                            pass
                     else:
-                        window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(1))
+                        try:
+                            window.addstr(baseline, STATUS_COLUMN_START, value3['status'], curses.color_pair(1))
+                        except curses.error:
+                            pass
 
     window.refresh()
 
