@@ -17,6 +17,7 @@ SCHEME="https"
 APIGATEWAY_URL=""
 CURL_AUTH_ARGUMENTS=""
 CURL_COMMON_ARGUMENTS="--silent --show-error --connect-timeout 10 --fail"
+SED_SANITIZE_REGEXP='s/\$[A-Za-z{}_]+/{}/' # Replace all environment variables with {} to sanitize templates
 
 SORT_OUTPUT="false"
 
@@ -82,8 +83,14 @@ elif [ "$RELEASE" == "" ]; then
 elif [ "$NAMESPACE" == "" ]; then
     echo "Namespace was not specified, aborting"
     exit 1
-elif [ "$OUTPUT_FOLDER" == "" ]; then
+fi
+
+if [ "$OUTPUT_FOLDER" == "" ]; then
+    # If output is empty, use input folder as output folder
     OUTPUT_FOLDER=$INPUT_FOLDER
+else
+    # Create the output folder if non-existent
+    mkdir -p "$OUTPUT_FOLDER"
 fi
 
 # --- Arguments ---
@@ -190,13 +197,13 @@ config_files=$(find -L $INPUT_FOLDER -iname "*.json" -type f -printf "%p\n" | so
 tmp_dir=$(mktemp -d)
 
 for config_file in $config_files; do
-    service_config_list=$(cat "${config_file}" | jq .)
-    service_name=$(basename -- "${config_file}" | sed -r 's/(.*).json/\1/')
+    service_config_list=$(cat "${config_file}" | sed -E $SED_SANITIZE_REGEXP | jq .)
+    service_name=$(basename -- "${config_file}" | sed -E 's/(.*).json/\1/')
 
     # For each elements in the root list
     index=0
     while [ TRUE ]; do
-        service_config_i=$(cat $config_file | jq .[$index])
+        service_config_i=$(cat $config_file  | sed -E $SED_SANITIZE_REGEXP | jq .[$index])
         if [ "$service_config_i" == "null" ]; then
             break
         fi
@@ -232,7 +239,7 @@ for config_file in $config_files; do
 done
 
 for config_file in $config_files; do
-    service_name=$(basename -- "${config_file}" | sed -r 's/(.*).json/\1/')
+    service_name=$(basename -- "${config_file}" | sed -E 's/(.*).json/\1/')
     if [ -f "$tmp_dir/$service_name.json" ]; then
         cp "$tmp_dir/$service_name.json" "$OUTPUT_FOLDER/$service_name.json"
     fi
