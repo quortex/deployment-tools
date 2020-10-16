@@ -113,6 +113,17 @@ else
     echo "USING: KUBEPROXY"
 fi
 
+# We store all substitution variables to explicitly envsubst on these variables only
+VARS=
+for val in ${SUBST[@]}
+do
+    VARS=${VARS:+$VARS }\$"$(cut -d'=' -f1 <<<$val)"
+done
+for val in ${BSUBST[@]}
+do
+    VARS=${VARS:+$VARS }\$"$(cut -d'=' -f1 <<<$val)"
+done
+
 REMUUID_FUNCTION='
 def walk(f):
   . as $in
@@ -390,7 +401,7 @@ function update_configuration() {
         printf "Updating $service"
         while [ TRUE ]; do
             # Read configuration
-            config=$(envsubst <$configfile | jq .[$i])
+            config=$(eval "envsubst <$configfile '"$VARS"' | jq .[$i]")
             if [ "$config" == "null" ]; then
                 break
             fi
