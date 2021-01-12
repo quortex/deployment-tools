@@ -1,16 +1,16 @@
 FROM debian:buster
 
-ARG AWSCLI_VERSION=1.18.160
-ARG AZURECLI_VERSION=2.7.0-1
-ARG CLOUD_SDK_VERSION=314.0.0
-ARG HELM_VERSION=v3.3.4
+ARG AWSCLI_VERSION=1.18.211
+ARG AZURECLI_VERSION=2.17.1
+ARG CLOUD_SDK_VERSION=322.0.0
+ARG HELM_VERSION=v3.4.2
 ARG HELM_DIFF_VERSION=v3.1.3
 ARG ISTIOCTL_VERSION=1.6.9
-ARG JSONNET_VERSION=v0.16.0
-ARG KOPS_VERSION=v1.18.1
-ARG KUBECTL_VERSION=v1.19.2
-ARG KUSTOMIZE_VERSION=v3.8.5
-ARG TERRAFORM_VERSION=0.12.29
+ARG JSONNET_VERSION=v0.17.0
+ARG KOPS_VERSION=v1.18.2
+ARG KUBECTL_VERSION=v1.20.1
+ARG KUSTOMIZE_VERSION=v3.9.1
+ARG TERRAFORM_VERSION=0.14.4
 ARG YQ_VERSION=2.11.1
 
 # Some required tools
@@ -37,9 +37,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 RUN pip3 install awscli==${AWSCLI_VERSION}
 
 # Azure cli install
-RUN echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/azure-cli.list && \
-  curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/microsoft.asc.gpg > /dev/null && \
-  apt-get update && apt-get install -y azure-cli=${AZURECLI_VERSION}~$(lsb_release -cs)
+RUN pip3 install azure-cli==${AZURECLI_VERSION}
 
 # Python dependencies
 RUN pip3 install kubernetes==11.0.0
