@@ -10,6 +10,8 @@ from copy import deepcopy
 
 from kubernetes import client, config
 
+# Default name service of the segmenter Ainode.
+DEFAULT_SVC_SEGMENTER_AINODE = "segmenter-ainode"
 
 ###########################################
 ### GLOBAL VARIABLES ######################
@@ -43,9 +45,9 @@ BASELINE_OFFSET         = 0
 ###########################################
 ### COMMON FUNCTIONS ######################
 ###########################################
-def get_ainode_all_conf():
+def get_ainode_all_conf(seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     clientcorev1 = client.CoreV1Api()
-    services = clientcorev1.list_service_for_all_namespaces(label_selector="app.kubernetes.io/name=segmenter-ainode,app.quortex.io/type=ainode")
+    services = clientcorev1.list_service_for_all_namespaces(label_selector=f"app.kubernetes.io/name={seg_ainode_name},app.quortex.io/type=ainode")
     upstreamgroups = list()
     if len(services.items):
         service = services.items[0]
@@ -143,11 +145,11 @@ def get_ainode_conf(ainodesconfs,groupname):
             groupconf.append(ainodeconf)
     return groupconf
 
-def get_segmenter_status(name):
+def get_segmenter_status(name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     status = dict()
     clientcorev1 = client.CoreV1Api()
 
-    upstreamgroups = get_ainode_all_conf()
+    upstreamgroups = get_ainode_all_conf(seg_ainode_name=seg_ainode_name)
 
     segmenterdeps = get_segmenter_deployments(name=name)
 
@@ -342,11 +344,11 @@ async def interract(name, window, newversion):
             keypressed = window.getch()
         await asyncio.sleep(0.2)
 
-async def display_status(name, window, newversion):
+async def display_status(name, window, newversion, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     global active
     global status
     while active:
-        status = get_segmenter_status(name)
+        status = get_segmenter_status(name, seg_ainode_name=seg_ainode_name)
         render(name, status, window, newversion)
         await asyncio.sleep(1)
 
@@ -443,9 +445,9 @@ async def put_deployment_version(deployment,newversion):
 
         await asyncio.sleep(1)
 
-def put_ainode_conf(conf):
+def put_ainode_conf(conf, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     clientcorev1 = client.CoreV1Api()
-    services = clientcorev1.list_service_for_all_namespaces(label_selector="app.kubernetes.io/name=segmenter-ainode,app.quortex.io/type=ainode")
+    services = clientcorev1.list_service_for_all_namespaces(label_selector=f"app.kubernetes.io/name={seg_ainode_name},app.quortex.io/type=ainode")
     if len(services.items):
         service = services.items[0]
         path_params = {"name": f"{service.metadata.name}:api",
@@ -516,9 +518,9 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
 
     await asyncio.sleep(1)
 
-async def upgrade_version(name, newversion, groupids, overbw, parallel):
+async def upgrade_version(name, newversion, groupids, overbw, parallel, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     deployments = get_segmenter_deployments(name=name,groupids=groupids)
-    ainodeconfs = get_ainode_all_conf()
+    ainodeconfs = get_ainode_all_conf(seg_ainode_name=seg_ainode_name)
 
     if len(deployments) == 0:
         return
@@ -557,13 +559,14 @@ if __name__ == '__main__':
     # Parse argument
     parser = argparse.ArgumentParser()
     required = parser.add_argument_group('required arguments')
-    required.add_argument("-v", "--version",        default="",             help="The new segmenter version to update")
-    required.add_argument("-n", "--name",           default="segmenter",    help="Specify the basename of the segmenters")
-    required.add_argument("-d", "--display",        default=False,          help="Display ongoing update",                  action='store_true')
-    required.add_argument("-u", "--upgrade",        default=False,          help="Do upgrade",                              action='store_true')
-    required.add_argument("-o", "--overbandwidth",  default=False,          help="Allow overbandwidth for mono segmenter",  action='store_true')
-    required.add_argument("-p", "--parallel",       default=False,          help="Allow parallel update of segmenters",     action='store_true')
-    required.add_argument("-g", "--group",          default=None,           help="Specify the list of group to update",     nargs='+')
+    required.add_argument("-v", "--version",        default="",                             help="The new segmenter version to update")
+    required.add_argument("-n", "--name",           default="segmenter",                    help="Specify the basename of the segmenters")
+    required.add_argument("-d", "--display",        default=False,                          help="Display ongoing update",                  action='store_true')
+    required.add_argument("-u", "--upgrade",        default=False,                          help="Do upgrade",                              action='store_true')
+    required.add_argument("-o", "--overbandwidth",  default=False,                          help="Allow overbandwidth for mono segmenter",  action='store_true')
+    required.add_argument("-p", "--parallel",       default=False,                          help="Allow parallel update of segmenters",     action='store_true')
+    required.add_argument("-a", "--ainodename",     default=DEFAULT_SVC_SEGMENTER_AINODE,   help="Specify the ainode name in charge")
+    required.add_argument("-g", "--group",          default=None,                           help="Specify the list of group to update",     nargs='+')
 
 
     # Get arguments
@@ -597,11 +600,11 @@ if __name__ == '__main__':
         window.keypad(True)
         window.nodelay(True)
         futures.append(interract(name=args.name, window=window, newversion=args.version))
-        futures.append(display_status(name=args.name, window=window, newversion=args.version))
+        futures.append(display_status(name=args.name, window=window, newversion=args.version, seg_ainode_name=args.ainodename))
 
     # If upgrade enabled, add upgrade coroutine
     if args.upgrade:
-        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel))
+        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel, seg_ainode_name=args.ainodename))
 
     # Start coroutines
     try:
@@ -610,5 +613,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         active = False
         if args.display:
-            loop.run_until_complete(display_status(name=args.name, window=window,newversion=args.version))
+            loop.run_until_complete(display_status(name=args.name, window=window,newversion=args.version, seg_ainode_name=args.ainodename))
         print("End upgrade...")
