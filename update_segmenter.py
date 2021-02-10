@@ -6,12 +6,44 @@ import curses
 import json
 import os
 import sys
+import logging
 from copy import deepcopy
 
 from kubernetes import client, config
 
 # Default name service of the segmenter Ainode.
 DEFAULT_SVC_SEGMENTER_AINODE = "segmenter-ainode"
+
+###########################################
+### LOGGER WRAPPER API ####################
+###########################################
+class LoggerWrapper:
+    def __init__(self):
+        self.active = False
+
+    def init(self, filename=None):
+        if filename is None:
+            logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s',
+                                datefmt='%m/%d/%Y %H:%M:%S')
+        else:
+            logging.basicConfig(filename=filename, filemode='w', level=logging.INFO,
+                                format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%m/%d/%Y %H:%M:%S')
+        self.active = True
+
+    def info(self, message):
+        if self.active:
+            logging.info(message)
+
+    def warning(self, message):
+        if self.active:
+            logging.warning(message)
+
+    def error(self, message):
+        if self.active:
+            logging.error(message)
+
+# Global wrapper logger used (enable, disable, using stdout or file)
+LOGGER = LoggerWrapper()
 
 ###########################################
 ### GLOBAL VARIABLES ######################
@@ -55,6 +87,12 @@ def get_ainode_all_conf(seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     return upstreamgroups
 
 def get_segmenter_deployments(name, groupids=None):
+    # Specific correct identification of the group ID: tf1 => -tf1- to prevent getting tf1sf groupId.
+    if groupids is None:
+        exact_groupids = list()
+    else:
+        exact_groupids = [ f"-{idval}-" for idval in groupids ]
+
     clientappsv1 = client.AppsV1Api()
     result = clientappsv1.list_deployment_for_all_namespaces(label_selector=f"type=unit,vendor=quortex")
     segmenterdeps = list()
@@ -62,8 +100,8 @@ def get_segmenter_deployments(name, groupids=None):
         # Keep deployments starting with good basename. default is "segmenter"
         if item.metadata.name.startswith(f"{name}-"):
             # Filter groups depending groupids filter
-            if groupids is not None:
-                for groupid in groupids:
+            if exact_groupids:
+                for groupid in exact_groupids:
                     if "group" in item.spec.template.metadata.labels:
                         if groupid in item.spec.template.metadata.labels["group"]:
                             segmenterdeps.append(item)
@@ -71,6 +109,39 @@ def get_segmenter_deployments(name, groupids=None):
             else:
                 segmenterdeps.append(item)
     return segmenterdeps
+
+def sort_segmenter_deployments_id_name(seg_deployments, id_name):
+    sorted_deployment = list()
+    dep_names = dict()
+    # Get all segmenter deployment name and index in order to reorder.
+    for idx, deployment in enumerate(seg_deployments):
+        name = deployment.metadata.name
+        dep_names[name] = idx
+
+    # Sort alphabetically the deployment name and use the id name to identify the priority extra order
+    prev_name = list()
+    sorted_name_with_id = list()
+    for key in sorted(dep_names.keys()):
+        # Check the priority id name existance.
+        if id_name and id_name in key:
+            sorted_name_with_id.append(key)
+            sorted_name_with_id.extend(prev_name)
+            prev_name = list()
+        else:
+            prev_name.append(key)
+
+    # Loop all sorted name and build the new deployment list according to the associated index previously saved.
+    if sorted_name_with_id:
+        for cur_name in sorted_name_with_id:
+            # Index of the deployment associated to the name to insert into the new deployment list.
+            idx = dep_names[cur_name]
+            sorted_deployment.append(seg_deployments[idx])
+    else:
+        # No sorted operation, retun the initial segmenter deployment.
+        sorted_deployment = seg_deployments
+
+
+    return sorted_deployment
 
 def get_pod_status(pod):
     if pod.metadata.deletion_timestamp is not None:
@@ -169,7 +240,7 @@ def get_segmenter_status(name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
                                                                                                                                                  "ready":      get_pod_ready_container(pod)}
     return status
 
-def render(name, status, window, newversion):
+def render(name, status, window, id_prio_name, newversion):
     window.clear()
     update_sizing(window)
     baseline = BASELINE_OFFSET
@@ -179,7 +250,10 @@ def render(name, status, window, newversion):
         except curses.error:
             pass
         try:
-            window.addstr(baseline, ID_COLUMN_START,        "ID")
+            extra_info = ""
+            if id_prio_name is not None:
+                extra_info = f" ({id_prio_name})"
+            window.addstr(baseline, ID_COLUMN_START,        f"ID{extra_info}")
         except curses.error:
             pass
         try:
@@ -322,7 +396,7 @@ def render(name, status, window, newversion):
 
     window.refresh()
 
-async def interract(name, window, newversion):
+async def interract(name, window, id_prio_name, newversion):
     global active
     global BASELINE_OFFSET
     global status
@@ -340,16 +414,16 @@ async def interract(name, window, newversion):
             if BASELINE_OFFSET > 0:
                 BASELINE_OFFSET = 0
             if status is not None:
-                render(name, status, window, newversion)
+                render(name, status, window, id_prio_name, newversion)
             keypressed = window.getch()
         await asyncio.sleep(0.2)
 
-async def display_status(name, window, newversion, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
+async def display_status(name, window, id_prio_name, newversion, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     global active
     global status
     while active:
         status = get_segmenter_status(name, seg_ainode_name=seg_ainode_name)
-        render(name, status, window, newversion)
+        render(name, status, window, id_prio_name, newversion)
         await asyncio.sleep(1)
 
     window.clear()
@@ -469,6 +543,7 @@ def put_ainode_conf(conf, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
                                                      collection_formats={})
 
 async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
+    LOGGER.info(f"Upgrading deployment deployments={deployment.metadata.name} with version {newversion}")
     # Check if deployment is correct version
     _baseimage, version = extract_name(deployment.spec.template.spec.containers[0].image)
     if version == newversion:
@@ -507,19 +582,25 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     # 3: the deployment is not used
     if overbw is False or nbupstream != 1 or notused is True:
         nbreplicas = deployment.spec.replicas
+        LOGGER.info(f"Set to O replica: OverBandwidth={overbw} NbUpstreams={nbupstream} (used={not notused}) InitReplica={nbreplicas}")
         await put_deployment_replicas(deployment,0)
 
     # Upgrade version of deployment
+    LOGGER.info(f"Edit deployment to new version {newversion}")
     await put_deployment_version(deployment,newversion)
 
     # Reset replicas to nominal value
     if overbw is False or nbupstream != 1 or notused is True:
+        LOGGER.info(f"Restore replica to {nbreplicas}: OverBandwidth={overbw} NbUpstreams={nbupstream} (used={not notused}) InitReplica={nbreplicas}")
         await put_deployment_replicas(deployment,nbreplicas)
 
     await asyncio.sleep(1)
 
-async def upgrade_version(name, newversion, groupids, overbw, parallel, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
+async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
     deployments = get_segmenter_deployments(name=name,groupids=groupids)
+    # Sort the segmenter deployment accorging to the segmenter ID name priority if needed.
+    if id_prio_name is not None:
+        deployments = sort_segmenter_deployments_id_name(deployments, id_prio_name)
     ainodeconfs = get_ainode_all_conf(seg_ainode_name=seg_ainode_name)
 
     if len(deployments) == 0:
@@ -567,6 +648,8 @@ if __name__ == '__main__':
     required.add_argument("-p", "--parallel",       default=False,                          help="Allow parallel update of segmenters",     action='store_true')
     required.add_argument("-a", "--ainodename",     default=DEFAULT_SVC_SEGMENTER_AINODE,   help="Specify the ainode name in charge")
     required.add_argument("-g", "--group",          default=None,                           help="Specify the list of group to update",     nargs='+')
+    required.add_argument("-i", "--id-prio",        default=None,                           help="Specify the id of the segmenter to execute the upgrade first (th2, pa3, pri, sec")
+    required.add_argument("-l", "--log-file",       default=None,                           help="Enable the file log and specify the name of the log file")
 
 
     # Get arguments
@@ -584,6 +667,11 @@ if __name__ == '__main__':
         print("Cannot upgrade without version")
         sys.exit(-1)
 
+    # Logging configuration.
+    if args.log_file:
+        LOGGER.init(args.log_file)
+    LOGGER.info(f"Launching Segmenter upgrade with parameters: {args}")
+
     futures = list()
 
     # If display enable, add display coroutine
@@ -599,12 +687,12 @@ if __name__ == '__main__':
         window = curses.newwin(20, 10, 0, 0)
         window.keypad(True)
         window.nodelay(True)
-        futures.append(interract(name=args.name, window=window, newversion=args.version))
-        futures.append(display_status(name=args.name, window=window, newversion=args.version, seg_ainode_name=args.ainodename))
+        futures.append(interract(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version))
+        futures.append(display_status(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version, seg_ainode_name=args.ainodename))
 
     # If upgrade enabled, add upgrade coroutine
     if args.upgrade:
-        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel, seg_ainode_name=args.ainodename))
+        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel, id_prio_name=args.id_prio, seg_ainode_name=args.ainodename))
 
     # Start coroutines
     try:
@@ -613,5 +701,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         active = False
         if args.display:
-            loop.run_until_complete(display_status(name=args.name, window=window,newversion=args.version, seg_ainode_name=args.ainodename))
+            loop.run_until_complete(display_status(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version, seg_ainode_name=args.ainodename))
         print("End upgrade...")
