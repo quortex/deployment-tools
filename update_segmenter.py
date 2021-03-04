@@ -597,6 +597,7 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     await asyncio.sleep(1)
 
 async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
+    global active
     deployments = get_segmenter_deployments(name=name,groupids=groupids)
     # Sort the segmenter deployment accorging to the segmenter ID name priority if needed.
     if id_prio_name is not None:
@@ -633,6 +634,12 @@ async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_
     else:
         for dep in deployments:
             await upgrade_deployment(dep, ainodeconfs, newversion, overbw)
+
+    # End of deployment, stop other processes.
+    string_info = "Upgrade is finished..."
+    LOGGER.info(string_info)
+    print(string_info)
+    active = False
 
 
 if __name__ == '__main__':
@@ -700,6 +707,12 @@ if __name__ == '__main__':
         loop.run_until_complete(asyncio.gather(*futures))
     except KeyboardInterrupt:
         active = False
-        if args.display:
+        print("<CTRL+C> entered by the user, stopping ....")
+
+    # Wait for stop processes.
+    try:
+        if not active and args.display:
             loop.run_until_complete(display_status(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version, seg_ainode_name=args.ainodename))
-        print("End upgrade...")
+    except Exception as e:
+        print(f"Exception while waiting end of display loop: {e}")
+    print(f"End of upgrade process")
