@@ -441,7 +441,7 @@ def send_die_to_pod(pod):
 def extract_name(image):
     return image.rsplit(":",1)[0], image.rsplit(":",1)[1]
 
-async def put_deployment_replicas(deployment,replicas):
+async def put_deployment_replicas(deployment, replicas, force_die=True):
     clientappsv1 = client.AppsV1Api()
     clientcorev1 = client.CoreV1Api()
     patch = {"spec":{"replicas": replicas}}
@@ -465,11 +465,13 @@ async def put_deployment_replicas(deployment,replicas):
                 ready = False
 
             # Accelerate termination by sending die signal
-            if get_pod_status(pod) == "Terminating":
-                if podready == "1/1" or podready == "2/2":
-                    if pod.metadata.name not in died:
-                        died.append(pod.metadata.name)
-                        send_die_to_pod(pod)
+            if force_die:
+                if get_pod_status(pod) == "Terminating":
+                    if podready == "1/1" or podready == "2/2":
+                        if pod.metadata.name not in died:
+                            LOGGER.info(f"Force send DIE command on pod {pod.metadata.name}")
+                            died.append(pod.metadata.name)
+                            send_die_to_pod(pod)
 
         await asyncio.sleep(1)
 
@@ -542,7 +544,7 @@ def put_ainode_conf(conf, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
                                                      _request_timeout=None,
                                                      collection_formats={})
 
-async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
+async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw, force_die=False):
     LOGGER.info(f"Upgrading deployment deployments={deployment.metadata.name} with version {newversion}")
     # Check if deployment is correct version
     _baseimage, version = extract_name(deployment.spec.template.spec.containers[0].image)
@@ -583,7 +585,7 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     if overbw is False or nbupstream != 1 or notused is True:
         nbreplicas = deployment.spec.replicas
         LOGGER.info(f"Set to O replica: OverBandwidth={overbw} NbUpstreams={nbupstream} (used={not notused}) InitReplica={nbreplicas}")
-        await put_deployment_replicas(deployment,0)
+        await put_deployment_replicas(deployment,0,force_die)
 
     # Upgrade version of deployment
     LOGGER.info(f"Edit deployment to new version {newversion}")
@@ -592,11 +594,11 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw):
     # Reset replicas to nominal value
     if overbw is False or nbupstream != 1 or notused is True:
         LOGGER.info(f"Restore replica to {nbreplicas}: OverBandwidth={overbw} NbUpstreams={nbupstream} (used={not notused}) InitReplica={nbreplicas}")
-        await put_deployment_replicas(deployment,nbreplicas)
+        await put_deployment_replicas(deployment,nbreplicas,force_die)
 
     await asyncio.sleep(1)
 
-async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
+async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE, force_die=False):
     global active
     deployments = get_segmenter_deployments(name=name,groupids=groupids)
     # Sort the segmenter deployment accorging to the segmenter ID name priority if needed.
@@ -618,13 +620,13 @@ async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_
             groupname = get_group(dep)
             if groupname not in deplist1:
                 deplist1.append(groupname)
-                futures1.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw))
+                futures1.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
             elif groupname not in deplist2:
                 deplist2.append(groupname)
-                futures2.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw))
+                futures2.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
             elif groupname not in deplist3:
                 deplist3.append(groupname)
-                futures3.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw))
+                futures3.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
         if len(futures1):
             await asyncio.gather(*futures1)
         if len(futures2):
@@ -633,7 +635,7 @@ async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_
             await asyncio.gather(*futures3)
     else:
         for dep in deployments:
-            await upgrade_deployment(dep, ainodeconfs, newversion, overbw)
+            await upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die)
 
     # End of deployment, stop other processes.
     string_info = "Upgrade is finished..."
@@ -657,6 +659,7 @@ if __name__ == '__main__':
     required.add_argument("-g", "--group",          default=None,                           help="Specify the list of group to update",     nargs='+')
     required.add_argument("-i", "--id-prio",        default=None,                           help="Specify the id of the segmenter to execute the upgrade first (th2, pa3, pri, sec")
     required.add_argument("-l", "--log-file",       default=None,                           help="Enable the file log and specify the name of the log file")
+    required.add_argument("-f", "--force-die",      default=False,                          help="Force sending a DIE command on a Terminating pod for a faster upgrade", action='store_true')
 
 
     # Get arguments
@@ -699,7 +702,8 @@ if __name__ == '__main__':
 
     # If upgrade enabled, add upgrade coroutine
     if args.upgrade:
-        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel, id_prio_name=args.id_prio, seg_ainode_name=args.ainodename))
+        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel,
+                                       id_prio_name=args.id_prio, seg_ainode_name=args.ainodename, force_die=args.force_die))
 
     # Start coroutines
     try:
