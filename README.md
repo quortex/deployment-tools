@@ -33,6 +33,8 @@ These files should  also follow a strict JSON format :
 Both can be used with the **Kubernetes API** or with the **external API**. By default, they use the kubernetes API, to use the external use the options `-A
 api.mycluster.com -u myuser:mypassword`.
 
+---
+
 ## Update scripts
 
 The script update_segmenter.py allows the massive update of segmenters unit.
@@ -81,3 +83,30 @@ Upgrade the version of units in parallel and allow over bandwidth consumption:
 ```
 $./update_segmenter.py --display --upgrade --parallel --version rel-x.x.x --overbandwidth
 ```
+
+---
+
+## drainnode
+
+The purpose of this script is to perform node-by-node cluster rolling updates.
+It allows to make the targeted nodes unschedulable and to drain them one by one.
+
+
+**Drain out nodes based on node names.**
+```
+drainnode node1 node2
+```
+
+**Drain out nodes based on labels.**
+```
+drainnode -l foo=bar -l bar=baz
+```
+
+### Usage
+
+- -h --help: show the help message
+- -l --selector: selectors (label query) to filter nodes on
+- -c --count: count of non-running pods (completed/error) in the cluster before starting draining process
+- --dry-run: simulate nodes drain
+- -y --yes: run non interractively
+- --no-color: remove the additional color from the output

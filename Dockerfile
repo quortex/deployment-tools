@@ -91,6 +91,7 @@ COPY getconfig.sh                               /usr/bin/quortex/getconfig
 COPY pushconfig.sh                              /usr/bin/quortex/pushconfig
 COPY update_segmenter.py                        /usr/bin/quortex/updatesegmenter
 COPY enable_distribution_additional_metrics.py  /usr/bin/quortex/enable_distribution_additional_metrics.py
+COPY drainnodes.sh                              /usr/bin/quortex/drainnodes
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
