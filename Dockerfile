@@ -93,6 +93,7 @@ COPY pushconfig.sh                              /usr/bin/quortex/pushconfig
 COPY update_segmenter.py                        /usr/bin/quortex/updatesegmenter
 COPY enable_distribution_additional_metrics.py  /usr/bin/quortex/enable_distribution_additional_metrics.py
 COPY drainnodes.sh                              /usr/bin/quortex/drainnodes
+COPY migrate_terraform_security_group_rules.sh  /usr/bin/quortex/migrate_terraform_security_group_rules
 
 ENV PATH=$PATH:/usr/bin/quortex/
 
