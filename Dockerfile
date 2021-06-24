@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
   wget \
   unzip \
   vim \
+  bc \
   ansible=2.7.7+dfsg-1
 
 # Google Cloud SDK install
