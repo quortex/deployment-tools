@@ -28,8 +28,13 @@ RUN apt-get update && apt-get install -y \
   wget \
   unzip \
   vim \
-  bc \
-  ansible=2.7.7+dfsg-1
+  bc
+
+# Ansible install: specific ansible version not present into debian base (use launchpad repos public key).
+# cf: https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-debian
+RUN echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" | tee -a /etc/apt/sources.list.d/ansible.list && \
+  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 && \
+  apt-get update && apt-get install -y ansible=2.9.23*
 
 # Google Cloud SDK install
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
