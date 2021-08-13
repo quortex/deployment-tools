@@ -396,10 +396,15 @@ def render(name, status, window, id_prio_name, newversion):
 
     window.refresh()
 
-async def interract(name, window, id_prio_name, newversion):
+async def interract(user_args, window):
     global active
     global BASELINE_OFFSET
     global status
+
+    # Get user arguments.
+    name = user_args.name
+    id_prio_name = user_args.id_prio
+    newversion = user_args.version
     while active:
         keypressed = window.getch()
         while keypressed != -1:
@@ -418,9 +423,16 @@ async def interract(name, window, id_prio_name, newversion):
             keypressed = window.getch()
         await asyncio.sleep(0.2)
 
-async def display_status(name, window, id_prio_name, newversion, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
+async def display_status(user_args, window):
     global active
     global status
+
+    # Get the user parameters.
+    name = user_args.name
+    id_prio_name = user_args.id_prio
+    newversion=user_args.version
+    seg_ainode_name=user_args.ainodename
+
     while active:
         status = get_segmenter_status(name, seg_ainode_name=seg_ainode_name)
         render(name, status, window, id_prio_name, newversion)
@@ -475,7 +487,7 @@ async def put_deployment_replicas(deployment, replicas, force_die=True):
 
         await asyncio.sleep(1)
 
-async def put_deployment_version(deployment,newversion):
+async def put_deployment_version(deployment,newversion, kube_app_name="segmenter-unit", kube_managed="segmenter-daemon"):
     clientappsv1 = client.AppsV1Api()
     clientcorev1 = client.CoreV1Api()
     baseimage, _version = extract_name(deployment.spec.template.spec.containers[0].image)
@@ -498,6 +510,42 @@ async def put_deployment_version(deployment,newversion):
                     }
                 }
             }
+
+    # Spec.template labels update new labels if needed.
+    new_labels = deployment.spec.template.metadata.labels
+    label_patch_info = ""
+    if 'app.kubernetes.io/instance' not in new_labels and 'app' in new_labels:
+        new_labels['app.kubernetes.io/instance'] = new_labels['app']
+        label_patch_info = f"app.kube.instance={new_labels['app.kubernetes.io/instance']}"
+    if 'app.kubernetes.io/name' not in new_labels:
+        new_labels['app.kubernetes.io/name'] = kube_app_name
+        label_patch_info = f"{label_patch_info} app.kube.name={new_labels['app.kubernetes.io/name']}"
+    if label_patch_info and new_labels:
+        LOGGER.info(f"Updating labels spec.template of deployment {deployment.metadata.name}: {label_patch_info}")
+        patch['spec']['template']['metadata'] = {'labels': new_labels}
+
+    # Metadata labels update new labels if needed.
+    new_labels = deployment.metadata.labels
+    label_patch_info = ""
+    if 'app.kubernetes.io/instance' not in new_labels and 'app' in new_labels:
+        new_labels['app.kubernetes.io/instance'] = new_labels['app']
+        label_patch_info = f"app.kube.instance={new_labels['app.kubernetes.io/instance']}"
+    if 'app.kubernetes.io/name' not in new_labels:
+        new_labels['app.kubernetes.io/name'] = kube_app_name
+        label_patch_info = f"{label_patch_info} app.kube.name={new_labels['app.kubernetes.io/name']}"
+    if 'app.kubernetes.io/managed-by' not in new_labels:
+        new_labels['app.kubernetes.io/managed-by'] = kube_managed
+        label_patch_info = f"{label_patch_info} app.kube.managed={new_labels['app.kubernetes.io/managed-by']}"
+    if 'vendor' not in new_labels:
+        new_labels['vendor'] = 'quortex'
+        label_patch_info = f"{label_patch_info} vendor={new_labels['vendor']}"
+    if 'group' not in new_labels and deployment.spec.template.metadata.labels.get('group'):
+        new_labels['group'] = deployment.spec.template.metadata.labels['group']
+        label_patch_info = f"{label_patch_info} group={new_labels['group']}"
+    if label_patch_info and new_labels:
+        LOGGER.info(f"Updating labels metadata of deployment {deployment.metadata.name}: {label_patch_info}")
+        patch['metadata'] = {'labels': new_labels}
+
     result = clientappsv1.patch_namespaced_deployment(deployment.metadata.name,deployment.metadata.namespace,patch)
     deployment = clientappsv1.read_namespaced_deployment(deployment.metadata.name,deployment.metadata.namespace)
     nbpods = deployment.spec.replicas
@@ -544,7 +592,8 @@ def put_ainode_conf(conf, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE):
                                                      _request_timeout=None,
                                                      collection_formats={})
 
-async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw, force_die=False):
+async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw, force_die=False, kube_app_name="segmenter-unit",
+                             kube_app_managed="segmenter-daemon"):
     LOGGER.info(f"Upgrading deployment deployments={deployment.metadata.name} with version {newversion}")
     # Check if deployment is correct version
     _baseimage, version = extract_name(deployment.spec.template.spec.containers[0].image)
@@ -589,7 +638,7 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw, force_
 
     # Upgrade version of deployment
     LOGGER.info(f"Edit deployment to new version {newversion}")
-    await put_deployment_version(deployment,newversion)
+    await put_deployment_version(deployment,newversion, kube_app_name, kube_app_managed)
 
     # Reset replicas to nominal value
     if overbw is False or nbupstream != 1 or notused is True:
@@ -598,8 +647,21 @@ async def upgrade_deployment(deployment, ainodeconfs, newversion, overbw, force_
 
     await asyncio.sleep(1)
 
-async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_name, seg_ainode_name=DEFAULT_SVC_SEGMENTER_AINODE, force_die=False):
+async def upgrade_version(user_args):
     global active
+
+    # Get user arguments.
+    name=user_args.name
+    newversion=user_args.version
+    groupids=user_args.group
+    overbw=user_args.overbandwidth
+    parallel=user_args.parallel
+    id_prio_name=user_args.id_prio
+    seg_ainode_name=user_args.ainodename
+    force_die=user_args.force_die
+    seg_kube_app_name=user_args.kube_app_name
+    seg_kube_app_managed=user_args.kube_app_manged
+
     deployments = get_segmenter_deployments(name=name,groupids=groupids)
     # Sort the segmenter deployment accorging to the segmenter ID name priority if needed.
     if id_prio_name is not None:
@@ -620,13 +682,13 @@ async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_
             groupname = get_group(dep)
             if groupname not in deplist1:
                 deplist1.append(groupname)
-                futures1.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
+                futures1.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die, seg_kube_app_name, seg_kube_app_managed))
             elif groupname not in deplist2:
                 deplist2.append(groupname)
-                futures2.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
+                futures2.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die, seg_kube_app_name, seg_kube_app_managed))
             elif groupname not in deplist3:
                 deplist3.append(groupname)
-                futures3.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die))
+                futures3.append(upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die, seg_kube_app_name, seg_kube_app_managed))
         if len(futures1):
             await asyncio.gather(*futures1)
         if len(futures2):
@@ -635,7 +697,7 @@ async def upgrade_version(name, newversion, groupids, overbw, parallel, id_prio_
             await asyncio.gather(*futures3)
     else:
         for dep in deployments:
-            await upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die)
+            await upgrade_deployment(dep, ainodeconfs, newversion, overbw, force_die, seg_kube_app_name, seg_kube_app_managed)
 
     # End of deployment, stop other processes.
     string_info = "Upgrade is finished..."
@@ -660,7 +722,8 @@ if __name__ == '__main__':
     required.add_argument("-i", "--id-prio",        default=None,                           help="Specify the id of the segmenter to execute the upgrade first (th2, pa3, pri, sec")
     required.add_argument("-l", "--log-file",       default=None,                           help="Enable the file log and specify the name of the log file")
     required.add_argument("-f", "--force-die",      default=False,                          help="Force sending a DIE command on a Terminating pod for a faster upgrade", action='store_true')
-
+    required.add_argument("-k", "--kube-app-name",  default="segmenter-unit",               help="Specify kube app name of the segmenter to set on pod labels (default is segmenter-unit")
+    required.add_argument("-m", "--kube-app-manged",default="segmenter-daemon",             help="Specify kube name of manging pod of the segmenter to set on pod labels (default is segmenter-daemon")
 
     # Get arguments
     args = parser.parse_args()
@@ -697,13 +760,12 @@ if __name__ == '__main__':
         window = curses.newwin(20, 10, 0, 0)
         window.keypad(True)
         window.nodelay(True)
-        futures.append(interract(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version))
-        futures.append(display_status(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version, seg_ainode_name=args.ainodename))
+        futures.append(interract(args, window=window))
+        futures.append(display_status(args, window=window))
 
     # If upgrade enabled, add upgrade coroutine
     if args.upgrade:
-        futures.append(upgrade_version(name=args.name, newversion=args.version, groupids=args.group, overbw=args.overbandwidth, parallel=args.parallel,
-                                       id_prio_name=args.id_prio, seg_ainode_name=args.ainodename, force_die=args.force_die))
+        futures.append(upgrade_version(args))
 
     # Start coroutines
     try:
@@ -716,7 +778,7 @@ if __name__ == '__main__':
     # Wait for stop processes.
     try:
         if not active and args.display:
-            loop.run_until_complete(display_status(name=args.name, window=window, id_prio_name=args.id_prio, newversion=args.version, seg_ainode_name=args.ainodename))
+            loop.run_until_complete(display_status(args, window=window))
     except Exception as e:
         print(f"Exception while waiting end of display loop: {e}")
     print(f"End of upgrade process")
