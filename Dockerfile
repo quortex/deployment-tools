@@ -12,6 +12,7 @@ ARG KUBECTL_VERSION=v1.20.1
 ARG KUSTOMIZE_VERSION=v3.9.1
 ARG TERRAFORM_VERSION=0.14.4
 ARG YQ_VERSION=2.11.1
+ARG ANSIBLE_VERSION=2.9.23
 
 # Some required tools
 RUN apt-get update && apt-get install -y \
@@ -30,12 +31,6 @@ RUN apt-get update && apt-get install -y \
   vim \
   bc
 
-# Ansible install: specific ansible version not present into debian base (use launchpad repos public key).
-# cf: https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html#installing-ansible-on-debian
-RUN echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" | tee -a /etc/apt/sources.list.d/ansible.list && \
-  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 && \
-  apt-get update && apt-get install -y ansible=2.9*
-
 # Google Cloud SDK install
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
@@ -49,6 +44,9 @@ RUN pip3 install azure-cli==${AZURECLI_VERSION}
 
 # Python dependencies
 RUN pip3 install kubernetes==11.0.0
+
+# Ansible install
+RUN pip3 install ansible==${ANSIBLE_VERSION}
 
 # kubectl install
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && \
