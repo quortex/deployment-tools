@@ -8,8 +8,9 @@
 FOLDER=""
 SCHEME="https"
 APPLY="backend,ainode,unit"
-VERSION="3.1.0"
+VERSION="3.2.0"
 NO_DRY_RUN=true
+TEST_MODE=false
 PRINT_SUBST=true
 VERBOSE=false
 RELEASE=""
@@ -17,6 +18,7 @@ NAMESPACE=""
 APIGATEWAY_URL=""
 CURL_AUTH_ARGUMENTS=""
 CURL_COMMON_ARGUMENTS="--silent --show-error --connect-timeout 10 --fail"
+EXTENSION_OVERRIDE=""
 
 function help() {
     cat <<EOF
@@ -38,10 +40,12 @@ Available options :
     -V                   Be verbose.
     -d                   Use this script in dry run: no change will be made.
     -h                   Display this help.
+    -o                   Override extension of .json configuration file. If set, any file named confXXX.json-<override-extension> will be used instead of confXXX.json.
+    -t                   Enable TEST mode. TEST mode activates dry run mode (-d) and does not estiblish connection with any k8s cluster.
 EOF
 }
 
-while getopts ":f:a:r:n:s:b:A:u:hvdIHV" opt; do
+while getopts ":f:a:r:n:s:b:A:u:hvdIHVo:t" opt; do
     case "$opt" in
     h)
         help
@@ -82,6 +86,13 @@ while getopts ":f:a:r:n:s:b:A:u:hvdIHV" opt; do
         ;;
     b)
         BSUBST+=("$OPTARG")
+        ;;
+    o)
+        EXTENSION_OVERRIDE=$OPTARG
+        ;;
+    t)
+        NO_DRY_RUN=false
+        TEST_MODE=true
         ;;
     *)
         echo "Unsupported flag provided : $OPTARG".
@@ -380,11 +391,20 @@ function update_configuration() {
 
     selector=$1
     api_port=$2
-    config_files=$(find -L $FOLDER -iname "*.json" -type f -printf "%p\n" | sort)
+    config_files=$(find -L $FOLDER \( -iname "*.json" ! -iname "*_${EXTENSION_OVERRIDE}.json" \) -type f -printf "%p\n" | sort)
 
     for configfile in $config_files; do
         if [ $(echo $configfile | grep $selector | wc -l) -eq 0 ]; then
             continue
+        fi
+
+        # Check extension override
+        if [ ! -z "${EXTENSION_OVERRIDE}" ]; then
+            pattern="${configfile%.*}_${EXTENSION_OVERRIDE}.json"
+            if [ -f "${pattern}" ]; then
+                echo "OVERRIDE: use '${pattern}' file instead of default ${configfile}"
+                configfile="${pattern}"
+            fi
         fi
 
         filename=$(basename -- "${configfile}") # Name of the file, without repertory
@@ -403,6 +423,13 @@ function update_configuration() {
             # Read configuration
             config=$(eval "envsubst <$configfile '"$VARS"' | jq .[$i]")
             if [ "$config" == "null" ]; then
+                break
+            elif [ -z "$config" ]; then
+                echo ""
+                echo '/!\ /!\ /!\ '
+                echo "/!\ /!\ /!\ WARNING: There is an error with file ${filename}: corrupted/invalid. Ignoring the file."
+                echo '/!\ /!\ /!\ '
+                echo ""
                 break
             fi
 
@@ -423,7 +450,6 @@ function update_configuration() {
             else
                 existing_confs="{}"
             fi
-
             add_config "$new_confs" "$existing_confs" "$full_url"
             delete_config "$new_confs" "$existing_confs" "$full_url"
 
@@ -434,23 +460,27 @@ function update_configuration() {
 }
 
 api_port=0
-if [ ! $APIGATEWAY_URL ]; then
-    # Start a kubectl proxy in the background, to access the services API
-    kubectl proxy -p 0 >proxy.port &
-    pid="$!"
-    sleep 3
-    kill -0 "${pid}" # Check that the proxy is started (the command "kill -0" returns an error status when the pid does not exist)
+if ! $TEST_MODE; then
+    if [ ! $APIGATEWAY_URL ]; then
+        # Start a kubectl proxy in the background, to access the services API
+        kubectl proxy -p 0 >proxy.port &
+        pid="$!"
+        sleep 3
+        kill -0 "${pid}" # Check that the proxy is started (the command "kill -0" returns an error status when the pid does not exist)
 
-    api_port=$(cat proxy.port | cut -d':' -f 2)
-    echo "API Proxy started on port $api_port (pid $pid)"
+        api_port=$(cat proxy.port | cut -d':' -f 2)
+        echo "API Proxy started on port $api_port (pid $pid)"
 
-    # Make sure to stop the proxy when this script ends (this function will be executed only at EXIT)
-    function cleanup() {
-        echo "Stopping proxy"
-        kill -9 "$pid" || true
-        rm proxy.port
-    }
-    trap cleanup EXIT
+        # Make sure to stop the proxy when this script ends (this function will be executed only at EXIT)
+        function cleanup() {
+            echo "Stopping proxy"
+            kill -9 "$pid" || true
+            rm proxy.port
+        }
+        trap cleanup EXIT
+    fi
+else
+    echo "[TEST MODE] Do not start kubectl proxy"
 fi
 
 for selector in $(echo "$APPLY" | tr "," " "); do
