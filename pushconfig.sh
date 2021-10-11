@@ -391,7 +391,7 @@ function update_configuration() {
 
     selector=$1
     api_port=$2
-    config_files=$(find -L $FOLDER \( -iname "*.json" ! -iname "*_${EXTENSION_OVERRIDE}.json" \) -type f -printf "%p\n" | sort)
+    config_files=$(find -L $FOLDER -iname "*.json" -type f -printf "%p\n" | grep -v -E "_([^_]+).json$" | sort)
 
     for configfile in $config_files; do
         if [ $(echo $configfile | grep $selector | wc -l) -eq 0 ]; then
