@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
   jq \
   lsb-release \
   python3 \
-  python3-dev \
+  libffi-dev \
   python3-pip \
   wget \
   unzip \
