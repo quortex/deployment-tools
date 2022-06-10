@@ -5,8 +5,6 @@ set -eu pipeline
 OVERPROVISIONER_NAMESPACE=cluster-overprovisioner
 OVERPROVISIONER_DEPLOYMENT=cluster-overprovisioner-captures-overprovisioner
 CAPTURE_NAMESPACE=reference
-#KUBESTATIC_NAMESPACE=kubestatic-system
-#KUBESTATIC_DEPLOYMENT=kubestatic
 
 # Colors
 end="\033[0m"
@@ -47,6 +45,10 @@ function yellow {
 	echo -e "${yellow}${1}${end}"
 }
 
+function yellowb {
+	echo -e "${yellowb}${1}${end}"
+}
+
 function redb {
 	echo -e "${redb}${1}${end}"
 }
@@ -79,11 +81,39 @@ function kubestatic_unlabel {
 	kubectl label node $1 kubestatic.quortex.io/externalip-auto-assign-
 }
 
+function check_capture_status {
+	echo -n "No capture pod should be pending, checking... "
+	for status in $(kubectl -n $CAPTURE_NAMESPACE get pods \
+									-l app.kubernetes.io/name=capture -o json | \
+									jq -r .items[].status.phase)
+	do
+		if [[ ${status} != "Running" ]]
+		then
+			fail_and_exit "All capture pods are not in a Running state, I can't continue."
+		fi
+	done
+	echo -e "${green}Ok${end}"
+}
+
+function check_overprovisioner_status {
+	echo -n "No capture overprovisioner should be pending, checking... "
+	for status in $(kubectl get -n $OVERPROVISIONER_NAMESPACE pods \
+									-l app.cluster-overprovisioner/deployment=captures-overprovisioner -o json \
+									| jq -r .items[].status.phase)
+	do
+		if [[ ${status} != "Running" ]]
+		then
+			fail_and_exit "All overprovisioner pods are not in a Running state, I can't continue."
+		fi
+	done
+	echo -e "${green}Ok${end}"
+}
 [[ ! $(which kubectl) ]] && fail_and_exit "kubectl CLI not found"
 
-whiteb "No capture pod should be pending"
-whiteb "No capture overprovisioner should be pending"
-echo
+check_capture_status
+check_overprovisioner_status
+white "Note that unschedulable capture nodes will be ignored."
+echo; echo
 whiteb "context:     $(kubectl config current-context)"
 echo -n "Continue? y/n "
 read answer
@@ -138,6 +168,7 @@ for node in ${nodes}; do
 	white "Working on ${node}"
 
 	# Drain capture node
+	start_downtime=`date +%s`
 	drain $node
 	kubestatic_unlabel $node
 	releaseip $node
@@ -162,6 +193,8 @@ for node in ${nodes}; do
 		green "Waiting for $pod to be scheduled..."
 		kubectl wait -n $CAPTURE_NAMESPACE --for=condition=ready pod ${pod} --timeout=300s
 	done
+	end_downtime=`date +%s`
+	yellowb "==> capture pods on ${node} were unavailable for $((end_downtime-start_downtime)) seconds."
 
 	# wait for OP pods to be scheduled
 	OP_podsName=$(
