@@ -79,11 +79,38 @@ function kubestatic_unlabel {
 	kubectl label node $1 kubestatic.quortex.io/externalip-auto-assign-
 }
 
+function check_capture_status {
+	echo -n "No capture pod should be pending, checking... "
+	for status in $(kubectl -n $CAPTURE_NAMESPACE get pods \
+									-l app.kubernetes.io/name=capture -o json | \
+									jq -r .items[].status.phase)
+	do
+		if [[ ${status} != "Running" ]]
+		then
+			fail_and_exit "All capture pods are not in a Running state, I can't continue."
+		fi
+	done
+	echo -e "${green}Ok${end}"
+}
+
+function check_overprovisioner_status {
+	echo -n "No capture overprovisioner should be pending, checking... "
+	for status in $(kubectl get -n $OVERPROVISIONER_NAMESPACE pods \
+									-l app.cluster-overprovisioner/deployment=captures-overprovisioner -o json \
+									| jq -r .items[].status.phase)
+	do
+		if [[ ${status} != "Running" ]]
+		then
+			fail_and_exit "All overprovisioner pods are not in a Running state, I can't continue."
+		fi
+	done
+	echo -e "${green}Ok${end}"
+}
 [[ ! $(which kubectl) ]] && fail_and_exit "kubectl CLI not found"
 
-whiteb "No capture pod should be pending"
-whiteb "No capture overprovisioner should be pending"
-echo
+check_capture_status
+check_overprovisioner_status
+echo; echo
 whiteb "context:     $(kubectl config current-context)"
 echo -n "Continue? y/n "
 read answer
