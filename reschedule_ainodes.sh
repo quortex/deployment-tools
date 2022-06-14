@@ -29,7 +29,7 @@ BATCH=(
   "segmenter-main,-ainode,statefulset,false"
   "cache,-mongodb,statefulset,false"
   "configuration,-mongodb,statefulset,false"
-  "dashmanifestgen-main,-backend,false"
+  "dashmanifestgen-main,-backend,deployment,false"
   "drmmanager-main,-backend,deployment,false"
   "encrypt-main,-backend,deployment,false"
   "hlsmanifestgen-main,-backend,deployment,false"
@@ -38,6 +38,12 @@ BATCH=(
   "xaudio-main,-backend,deployment,false"
   "xcode-main,-backend,deployment,false"
   "xsubtitles-main,-backend,deployment,false"
+)
+
+# List of other deployments not part of a workflow that should be rescheduled too, written <name>,<pod manager used>,<namespace>
+OTHER_BATCH=(
+  "traefik,deployment,kube-system"
+  "rtmp-loadbalancer,deployment,reference"
 )
 
 # Programm arguments parsing
@@ -104,8 +110,8 @@ fi
 echo -e "${GREEN}Cordon all ainode nodes ${NORMAL}"
 kubectl cordon -l ${AINODE_NODEGROUP_LABEL}
 
-# Reconciles ainodes in provider order
-echo -e "${GREEN}Starting restart of all ainodes...${NORMAL}"
+# Reschedule workflow deployments in order
+echo -e "${GREEN}Restarting all workflow pods...${NORMAL}"
 for deploy in "${BATCH[@]}"; do
   name=$(echo "${deploy}" | cut -d "," -f 1)
   type=$(echo "${deploy}" | cut -d "," -f 2)
@@ -123,4 +129,18 @@ for deploy in "${BATCH[@]}"; do
     echo -e "${YELLOW}Ainode needs to populate cache, waiting ${WAIT_TIME} seconds ${NORMAL}"
     sleep "${WAIT_TIME}"
   fi
+done
+
+# Reschedule other ainodes pods
+echo -e "${GREEN}Restarting all other pods...${NORMAL}"
+for deploy in "${OTHER_BATCH[@]}"; do
+  name=$(echo "${deploy}" | cut -d "," -f 1)
+  kind=$(echo "${deploy}" | cut -d "," -f 2)
+  namespace=$(echo "${deploy}" | cut -d "," -f 3)
+
+  echo -e "${GREEN}Rescheduling deployment ${name} ${NORMAL}"
+  kubectl rollout restart ${kind}/${name} -n ${namespace}
+
+  echo -e "${GREEN}Waiting for rollout to be complete ${NORMAL}"
+  kubectl rollout status ${kind} ${name} -n ${namespace}
 done
