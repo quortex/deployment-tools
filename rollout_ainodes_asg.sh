@@ -30,6 +30,11 @@ AINODES_BATCHS=(
   "segmenter-main,-ainode,deployment,false"
 )
 
+RTMP_STACKS=(
+  "rtmp-0"
+  "rtmp-1"
+)
+
 # Programm arguments parsing
 NAMESPACE="reference"
 WORKFLOWPOOL="quortex-reference"
@@ -50,7 +55,7 @@ Available options :
 EOF
 }
 
-while getopts ":n:w:t:h" opt; do
+while getopts ":n:w:t:l:h" opt; do
   case "$opt" in
   h)
     help
@@ -110,6 +115,22 @@ for deploy in "${AINODES_BATCHS[@]}"; do
     echo -e "${YELLOW}Ainode needs to populate cache, waiting ${WAIT_TIME} seconds ${NORMAL}"
     sleep "${WAIT_TIME}"
   fi
+done
+
+# Reschedule rtmp deployments stack by stack
+# This is a naive method, which should not affect HA rtmp stream, but has 25s + 20s of downtime
+for stack in "${RTMP_STACKS[@]}"; do
+  echo -e "${GREEN}Rescheduling all rtmp-handlers related to stack ${stack}...${NORMAL}"
+  kubectl -n "${NAMESPACE}" rollout restart deployment \
+    --selector "app.kubernetes.io/name=rtmp-handler,app.kubernetes.io/instance=${stack}"
+  kubectl -n "${NAMESPACE}" rollout status deployment \
+    --selector "app.kubernetes.io/name=rtmp-handler,app.kubernetes.io/instance=${stack}"
+
+  echo -e "${GREEN}Rescheduling all rtmp-loadbalancers related to stack ${stack}...${NORMAL}"
+  kubectl -n "${NAMESPACE}" rollout restart deployment \
+    --selector "app.kubernetes.io/name=rtmp-loadbalancer,app.kubernetes.io/instance=${stack}"
+  kubectl -n "${NAMESPACE}" rollout status deployment \
+    --selector "app.kubernetes.io/name=rtmp-loadbalancer,app.kubernetes.io/instance=${stack}"
 done
 
 # Drain all currently cordonned nodes
