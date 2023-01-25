@@ -37,6 +37,9 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
   apt-get update && apt-get install -y google-cloud-sdk=${CLOUD_SDK_VERSION}-0
 
+# Update pip
+RUN pip3 install --upgrade pip
+
 # AWS cli install
 RUN pip3 install awscli==${AWSCLI_VERSION}
 
