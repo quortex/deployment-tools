@@ -6,6 +6,7 @@
 
 # Bash strict mode
 set -euo pipefail
+trap 'wickStrictModeFail $?' ERR
 
 # Constants
 NORMAL="\033[0m"
@@ -136,13 +137,12 @@ done
 # Drain all currently cordonned nodes
 # The pods left should be drainable in parallel if respecting PDB
 echo -e "${GREEN}Finally drain all ainodes already cordonned nodes...${NORMAL}"
-nodes_to_rollout=$(
+read -ra nodes_to_rollout < <(
   kubectl get nodes \
     --selector "${AINODE_NODEGROUP_SELECTOR}" \
     --field-selector spec.unschedulable=true \
-    -o name
+    -o jsonpath="{.items[*]['metadata.name']}{'\n'}"
 )
-echo "The following nodes will be drained : ${nodes_to_rollout}"
-for node in ${nodes_to_rollout}; do
-  kubectl drain --ignore-daemonsets --delete-emptydir-data "${node}"
-done
+
+echo -e "${YELLOW}The following nodes will be drained : ${nodes_to_rollout[*]}${NORMAL} "
+kubectl drain --ignore-daemonsets --delete-emptydir-data "${nodes_to_rollout[@]}"
