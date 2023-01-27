@@ -142,7 +142,7 @@ for stack in ${RTMP_STACKS[@]+"${RTMP_STACKS[@]}"}; do
 done
 
 # Drain all currently cordonned nodes
-# The pods left should be drainable in parallel if respecting PDB
+# The pods left on the ASG should be drainable in parallel : mongodb (has PDB), traefik (has PDB), backends (non-critical).
 echo -e "${GREEN}Finally drain all ainodes already cordonned nodes...${NORMAL}"
 read -ra nodes_to_rollout < <(
   kubectl get nodes \
