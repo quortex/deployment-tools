@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# This script aim to rollout all ainodes, which is usefull when rollouting nodes to upgrade a kubernetes version.
-# All pods on ainode nodegroups will be forced to reschedule on new nodes.
+# This script cordon ainodes-fix-group nodes and reschedules all pods :
+# - It rollout ainodes in provided order
+# - It rollout rtmp stack by stack
+# - It drains everything left on the ASG
 # Old nodes will stay unschedulable until being removed by cluster-autoscaler
 
 # Bash strict mode
@@ -31,69 +33,77 @@ AINODES_BATCHS=(
   "segmenter-main,-ainode,deployment,false"
 )
 
-RTMP_STACKS=(
-  "rtmp-0"
-  "rtmp-1"
-)
-
 # Programm arguments parsing
-NAMESPACE="reference"
-WORKFLOWPOOL="quortex-reference"
-WAIT_TIME="120"
+RTMP_STACKS=()
+NAMESPACE=""
+WORKFLOWPOOL=""
+AINODE_WAIT_TIME="120"
+RTMP_WAIT_TIME="30"
 AINODE_NODEGROUP_SELECTOR="group=ainodes-fix-group"
 
 function help() {
   cat <<EOF
-Reschedule ainodes in a specific order.
+This script reschedules all pods on ainodes-fix-group :
+- It rollout ainodes in provided order
+- It rollout rtmp stack in provided order
+- It drains everything left on the ASG
 Usage : $0 -n NAMESPACE -w WORKFLOWPOOL [options]
 Mandatory arguments :
     -n NAMESPACE         Set namespace of the workflowpool.
     -w WORKFLOWPOOL :    Set the worflowpool name.
 Available options :
     -h                   Display this help.
-    -t                   Override the default time in seconds between batch, by default 120.
-    -l                   Override Ainode nodegroup label, default is group=ainodes-fix-group.
+    -s                   Add a rtmp stack to rollout splitted, can be used several times, by default none.
+    -t                   Override the default time in seconds between ainodes batch, by default ${AINODE_WAIT_TIME}.
+    -r                   Override the default time in seconds between rtmp stacks, by default ${RTMP_WAIT_TIME}.
+    -l                   Override Ainode nodegroup label, by default ${AINODE_NODEGROUP_SELECTOR}.
 EOF
 }
 
-while getopts ":n:w:t:l:h" opt; do
+while getopts ":n:w:t:s:r:l:h" opt; do
   case "$opt" in
   h)
     help
     exit 0
     ;;
-  n)
-    NAMESPACE=$OPTARG
-    ;;
-  w)
-    WORKFLOWPOOL=$OPTARG
-    ;;
-  t)
-    WAIT_TIME=$OPTARG
-    ;;
-  l)
-    AINODE_NODEGROUP_SELECTOR=$OPTARG
-    ;;
+  n) NAMESPACE="${OPTARG}" ;;
+  w) WORKFLOWPOOL="${OPTARG}" ;;
+  s) RTMP_STACKS+=("${OPTARG}") ;;
+  t) AINODE_WAIT_TIME="${OPTARG}" ;;
+  r) RTMP_WAIT_TIME="${OPTARG}" ;;
+  l) AINODE_NODEGROUP_SELECTOR="${OPTARG}" ;;
   *)
-    echo "Unsupported flag provided : $OPTARG".
+    echo "Unsupported flag provided : ${OPTARG}".
     help
     exit 1
     ;;
   esac
 done
 
-if [ "$NAMESPACE" == "" ]; then
+if [ -z "${NAMESPACE}" ]; then
   echo "Namespace was not specified, aborting"
   exit 1
 fi
 
-if [ "$WORKFLOWPOOL" == "" ]; then
+if [ -z "${WORKFLOWPOOL}" ]; then
   echo "WorkflowPool was not specified, aborting"
   exit 1
 fi
 
-if [ "$(kubectl get namespace ${NAMESPACE})" == "" ]; then
+if [ -z "$(kubectl get namespace ${NAMESPACE})" ]; then
   echo "Namespace ${NAMESPACE} does not exist, exiting."
+  exit 1
+fi
+
+echo -e "${YELLOW}This script will take the following actions :${NORMAL}"
+echo "* nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be cordonned"
+echo "* ainodes of workflow \"${WORKFLOWPOOL}\" in \"${NAMESPACE}\" will be rollouted in order waiting ${AINODE_WAIT_TIME}s between batchs"
+echo "* rtmp stacks [${RTMP_STACKS[*]+${RTMP_STACKS[*]}}] in \"${NAMESPACE}\" will be rollouted in order waiting ${RTMP_WAIT_TIME}s between batchs"
+echo "* nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be drained"
+read -rp "Continue? [y/n] " answer
+
+if [[ "${answer}" != "y" ]]; then
+  echo "Did not receive [y], exiting."
   exit 1
 fi
 
@@ -113,25 +123,22 @@ for deploy in "${AINODES_BATCHS[@]}"; do
   kubectl rollout status "${kind}/${WORKFLOWPOOL}-${name}${type}" -n "${NAMESPACE}"
 
   if [[ $wait == "true" ]]; then
-    echo -e "${YELLOW}Ainode needs to populate cache, waiting ${WAIT_TIME} seconds ${NORMAL}"
-    sleep "${WAIT_TIME}"
+    echo -e "${YELLOW}Ainode needs to populate cache, waiting ${AINODE_WAIT_TIME} seconds ${NORMAL}"
+    sleep "${AINODE_WAIT_TIME}"
   fi
 done
 
 # Reschedule rtmp deployments stack by stack
-# This is a naive method, which should not affect HA rtmp stream, but has 25s + 20s of downtime
-for stack in "${RTMP_STACKS[@]}"; do
-  echo -e "${GREEN}Rescheduling all rtmp-handlers related to stack ${stack}...${NORMAL}"
+# This is a naive method, which should not affect HA rtmp stream, but has 43 + 12s of black due to jumping to a loadbalancer to the next.
+# It has been choosen over doing them separately since util preStop is implemented it only increase the global black duration (35 + 45s).
+for stack in ${RTMP_STACKS[@]+"${RTMP_STACKS[@]}"}; do
+  echo -e "${GREEN}Rescheduling all rtmp loadbalancers and handlers related to stack ${stack}...${NORMAL}"
   kubectl -n "${NAMESPACE}" rollout restart deployment \
-    --selector "app.kubernetes.io/name=rtmp-handler,app.kubernetes.io/instance=${stack}"
+    --selector "app.kubernetes.io/name in (rtmp-loadbalancer,rtmp-handler),app.kubernetes.io/instance=${stack}"
   kubectl -n "${NAMESPACE}" rollout status deployment \
-    --selector "app.kubernetes.io/name=rtmp-handler,app.kubernetes.io/instance=${stack}"
+    --selector "app.kubernetes.io/name in (rtmp-loadbalancer,rtmp-handler),app.kubernetes.io/instance=${stack}"
 
-  echo -e "${GREEN}Rescheduling all rtmp-loadbalancers related to stack ${stack}...${NORMAL}"
-  kubectl -n "${NAMESPACE}" rollout restart deployment \
-    --selector "app.kubernetes.io/name=rtmp-loadbalancer,app.kubernetes.io/instance=${stack}"
-  kubectl -n "${NAMESPACE}" rollout status deployment \
-    --selector "app.kubernetes.io/name=rtmp-loadbalancer,app.kubernetes.io/instance=${stack}"
+  sleep "${RTMP_WAIT_TIME}"
 done
 
 # Drain all currently cordonned nodes
