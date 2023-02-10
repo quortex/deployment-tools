@@ -8,7 +8,8 @@ CAPTURE_NAMESPACE=reference
 CAPTURE_IMAGE=$(
   kubectl -n "${CAPTURE_NAMESPACE}" get deployments \
     --selector app.kubernetes.io/name=capture \
-    -o jsonpath='{.items[0].spec.template.spec.containers[0].image}'
+    -o jsonpath='{.items[*].spec.containers[*].image}' |
+    tr -s '[[:space:]]' '\n' | sort | uniq | head -n 1
 )
 
 # Colors
@@ -116,7 +117,7 @@ function check_overprovisioner_status {
 }
 
 function check_overprovisioner_image {
-  echo -n "Capture overprovisioner image should match capture pod, checking... "
+  echo -n "Capture overprovisioner image... "
   local overprovisioner_image
   overprovisioner_image=$(
     kubectl -n "${OVERPROVISIONER_NAMESPACE}" get deployment "${OVERPROVISIONER_DEPLOYMENT}" \
@@ -124,9 +125,10 @@ function check_overprovisioner_image {
   )
 
   if [ "${overprovisioner_image}" != "${CAPTURE_IMAGE}" ]; then
-    fail_and_exit "You must set capture overprovisioner image as the capture pod."
+    echo -e "${yellowb}You should set it to the most used capture image.${end}"
+  else
+    echo -e "${green}Ok${end}"
   fi
-  echo -e "${green}Ok${end}"
 }
 
 function now {
@@ -136,15 +138,15 @@ function now {
 [[ ! $(which kubectl) ]] && fail_and_exit "kubectl CLI not found"
 
 check_capture_status
-check_overprovisioner_image
 check_overprovisioner_status
+check_overprovisioner_image
 white "Note that unschedulable capture nodes will be ignored."
 echo
 echo
+whiteb "Kube context                       : $(kubectl config current-context)"
 whiteb "Capture overprovisioner deployment : ${OVERPROVISIONER_DEPLOYMENT}"
 whiteb "Capture overprovisioner namespace  : ${OVERPROVISIONER_NAMESPACE}"
-whiteb "Capture image                      : ${CAPTURE_IMAGE}"
-whiteb "Kube context                       : $(kubectl config current-context)"
+whiteb "Most used capture image            : ${CAPTURE_IMAGE}"
 echo -n "Continue? y/n "
 read -r answer
 
