@@ -8,7 +8,6 @@
 
 # Bash strict mode
 set -euo pipefail
-trap 'wickStrictModeFail $?' ERR
 
 # Constants
 NORMAL="\033[0m"
@@ -17,7 +16,6 @@ YELLOW="\033[0;33m"
 
 # List of the ainodes/mongo/backend to reschedule in order, written <name>,<suffix>,<pod manager used>,<should the script wait after>
 AINODES_BATCHS=(
-  "shield,,deployment,true"
   "lbalancer-main,-ainode,deployment,true"
   "dynamicrouter-main,-ainode,deployment,true"
   "drmmanager-main,-ainode,deployment,true"
@@ -37,6 +35,8 @@ AINODES_BATCHS=(
 RTMP_STACKS=()
 NAMESPACE=""
 WORKFLOWPOOL=""
+CORDON_ASG="true"
+DRAIN_ASG="true"
 AINODE_WAIT_TIME="120"
 RTMP_WAIT_TIME="30"
 AINODE_NODEGROUP_SELECTOR="group=ainodes-fix-group"
@@ -53,6 +53,8 @@ Mandatory arguments :
     -w WORKFLOWPOOL :    Set the worflowpool name.
 Available options :
     -h                   Display this help.
+    -c                   Should the script cordon all ainode nodes beforehand, by default ${CORDON_ASG}.
+    -d                   Should the script drain all ainode cordonned nodes afterward, by default ${DRAIN_ASG}.
     -s                   Add a rtmp stack to rollout splitted, can be used several times, by default none.
     -t                   Override the default time in seconds between ainodes batch, by default ${AINODE_WAIT_TIME}.
     -r                   Override the default time in seconds between rtmp stacks, by default ${RTMP_WAIT_TIME}.
@@ -60,7 +62,7 @@ Available options :
 EOF
 }
 
-while getopts ":n:w:t:s:r:l:h" opt; do
+while getopts ":n:w:c:d:t:s:r:l:h" opt; do
   case "$opt" in
   h)
     help
@@ -68,6 +70,8 @@ while getopts ":n:w:t:s:r:l:h" opt; do
     ;;
   n) NAMESPACE="${OPTARG}" ;;
   w) WORKFLOWPOOL="${OPTARG}" ;;
+  c) CORDON_ASG="${OPTARG}" ;;
+  d) DRAIN_ASG="${OPTARG}" ;;
   s) RTMP_STACKS+=("${OPTARG}") ;;
   t) AINODE_WAIT_TIME="${OPTARG}" ;;
   r) RTMP_WAIT_TIME="${OPTARG}" ;;
@@ -96,10 +100,15 @@ if [ -z "$(kubectl get namespace ${NAMESPACE})" ]; then
 fi
 
 echo -e "${YELLOW}This script will take the following actions :${NORMAL}"
-echo "* nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be cordonned"
+if [[ "${CORDON_ASG}" == "true" ]]; then
+  echo "* nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be cordonned"
+fi
 echo "* ainodes of workflow \"${WORKFLOWPOOL}\" in \"${NAMESPACE}\" will be rollouted in order waiting ${AINODE_WAIT_TIME}s between batchs"
 echo "* rtmp stacks [${RTMP_STACKS[*]+${RTMP_STACKS[*]}}] in \"${NAMESPACE}\" will be rollouted in order waiting ${RTMP_WAIT_TIME}s between batchs"
-echo "* nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be drained"
+if [[ "${DRAIN_ASG}" == "true" ]]; then
+  echo "* cordonned nodes matching \"${AINODE_NODEGROUP_SELECTOR}\" will be drained"
+fi
+
 read -rp "Continue? [y/n] " answer
 
 if [[ "${answer}" != "y" ]]; then
@@ -107,8 +116,10 @@ if [[ "${answer}" != "y" ]]; then
   exit 1
 fi
 
-echo -e "${GREEN}Cordon all ainode nodes ${NORMAL}"
-kubectl cordon --selector "${AINODE_NODEGROUP_SELECTOR}"
+if [[ "${CORDON_ASG}" == "true" ]]; then
+  echo -e "${GREEN}Cordon all ainode nodes ${NORMAL}"
+  kubectl cordon --selector "${AINODE_NODEGROUP_SELECTOR}"
+fi
 
 # Reschedule workflow deployments in order
 echo -e "${GREEN}Rescheduling all ainodes...${NORMAL}"
@@ -143,13 +154,15 @@ done
 
 # Drain all currently cordonned nodes
 # The pods left on the ASG should be drainable in parallel : mongodb (has PDB), traefik (has PDB), backends (non-critical).
-echo -e "${GREEN}Finally drain all ainodes already cordonned nodes...${NORMAL}"
-read -ra nodes_to_rollout < <(
-  kubectl get nodes \
-    --selector "${AINODE_NODEGROUP_SELECTOR}" \
-    --field-selector spec.unschedulable=true \
-    -o jsonpath="{.items[*]['metadata.name']}{'\n'}"
-)
+if [[ "${DRAIN_ASG}" == "true" ]]; then
+  echo -e "${GREEN}Finally drain all ainodes already cordonned nodes...${NORMAL}"
+  read -ra nodes_to_rollout < <(
+    kubectl get nodes \
+      --selector "${AINODE_NODEGROUP_SELECTOR}" \
+      --field-selector spec.unschedulable=true \
+      -o jsonpath="{.items[*]['metadata.name']}{'\n'}"
+  )
 
-echo -e "${YELLOW}The following nodes will be drained : ${nodes_to_rollout[*]}${NORMAL} "
-kubectl drain --ignore-daemonsets --delete-emptydir-data "${nodes_to_rollout[@]}"
+  echo -e "${YELLOW}The following nodes will be drained : ${nodes_to_rollout[*]}${NORMAL} "
+  kubectl drain --ignore-daemonsets --delete-emptydir-data "${nodes_to_rollout[@]}"
+fi
