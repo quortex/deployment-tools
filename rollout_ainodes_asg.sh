@@ -16,7 +16,6 @@ YELLOW="\033[0;33m"
 
 # List of the ainodes/mongo/backend to reschedule in order, written <name>,<suffix>,<pod manager used>,<should the script wait after>
 AINODES_BATCHS=(
-  "shield,,deployment,true"
   "lbalancer-main,-ainode,deployment,true"
   "dynamicrouter-main,-ainode,deployment,true"
   "drmmanager-main,-ainode,deployment,true"
