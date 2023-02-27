@@ -110,3 +110,14 @@ drainnode -l foo=bar -l bar=baz
 - --dry-run: simulate nodes drain
 - -y --yes: run non interractively
 - --no-color: remove the additional color from the output
+
+---
+
+## clean_pvc
+
+The purpose of this script is to delete unmounted pvcs in the reference namespace.
+
+### Usage
+
+- -h --help: show help message
+- --run: run deletion, default is false so nothing is deleted - aka default is dry-run.
