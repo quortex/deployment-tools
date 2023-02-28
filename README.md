@@ -10,7 +10,7 @@ The scripts `pushconfig.sh` and `getconfig.sh` are made to push and retrieve con
 
 Both of these scripts relies on a folder to know what to push or what to retrieve.
 
-These files should  also follow a strict JSON format :
+These files should also follow a strict JSON format :
 
 ```json
 [
@@ -30,8 +30,7 @@ These files should  also follow a strict JSON format :
 
 ### API
 
-Both can be used with the **Kubernetes API** or with the **external API**. By default, they use the kubernetes API, to use the external use the options `-A
-api.mycluster.com -u myuser:mypassword`.
+Both can be used with the **Kubernetes API** or with the **external API**. By default, they use the kubernetes API, to use the external use the options `-A api.mycluster.com -u myuser:mypassword`.
 
 ---
 
@@ -46,6 +45,7 @@ In addition, using the "--display" argument, the script acts as a monitoring too
 ### Dependencies
 
 The script update_segmenter.py requires following dependencies:
+
 - asyncio
 - kubernetes
 
@@ -91,13 +91,14 @@ $./update_segmenter.py --display --upgrade --parallel --version rel-x.x.x --over
 The purpose of this script is to perform node-by-node cluster rolling updates.
 It allows to make the targeted nodes unschedulable and to drain them one by one.
 
-
 **Drain out nodes based on node names.**
+
 ```
 drainnode node1 node2
 ```
 
 **Drain out nodes based on labels.**
+
 ```
 drainnode -l foo=bar -l bar=baz
 ```
@@ -121,3 +122,27 @@ The purpose of this script is to delete unmounted pvcs in the reference namespac
 
 - -h --help: show help message
 - --run: run deletion, default is false so nothing is deleted - aka default is dry-run.
+
+---
+
+## init_tf_backend_aws
+
+Provision the resources needed to store terraform states on AWS.
+
+A bucket on Amazon S3 will be created, as well as a Dynamo DB table to support
+state locking and consistency checking.
+
+### Usage
+
+```
+Usage : ./init_tf_backend_aws.sh -n NAME [options]
+
+Mandatory arguments :
+    -n NAME      Set the name of created resources.
+Available options :
+    -r REGION                   Specify the region in which to create the resources.
+    -p PREFIXED                 Whether to prefix the name with "<ACCOUNT ID>-tfstate-" (default true)
+    -b BLOCK_PUBLIC_ACCESS      Whether to block public access for s3 bucket (default true)
+    -y                          Execute script in non interactive mode.
+    -h                          Display this help.
+```
