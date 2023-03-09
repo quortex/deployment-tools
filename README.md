@@ -146,3 +146,24 @@ Available options :
     -y                          Execute script in non interactive mode.
     -h                          Display this help.
 ```
+
+---
+
+## get_cluster_config
+
+Compute a cluster Config from a given ServiceAccount.
+
+It requests the different kubernetes resources in order to build a cluster Config for a given ServiceAccount.
+
+### Usage
+
+```
+Usage : $0 -s SERVICE_ACCOUNT [options]
+
+Mandatory arguments :
+    -s SERVICE_ACCOUNT    The name of the ServiceAccount to use for the config.
+Available options :
+    -n NAMESPACE      The namespace of the ServiceAccount to use for the config. (default ${NAMESPACE}).
+    -c CLUSTER_NAME   Set the name of the cluster (default ${CLUSTER_NAME}).
+    -h                Display this help.
+```
