@@ -147,27 +147,7 @@ Available options :
     -h                          Display this help.
 ```
 
-## init_tf_backend_aws
-
-Provision the resources needed to store terraform states on AWS.
-
-A bucket on Amazon S3 will be created, as well as a Dynamo DB table to support
-state locking and consistency checking.
-
-### Usage
-
-```
-Usage : ./init_tf_backend_aws.sh -n NAME [options]
-
-Mandatory arguments :
-    -n NAME      Set the name of created resources.
-Available options :
-    -r REGION                   Specify the region in which to create the resources.
-    -p PREFIXED                 Whether to prefix the name with "<ACCOUNT ID>-tfstate-" (default true)
-    -b BLOCK_PUBLIC_ACCESS      Whether to block public access for s3 bucket (default true)
-    -y                          Execute script in non interactive mode.
-    -h                          Display this help.
-```
+---
 
 ## init_tf_backend_azure
 

@@ -67,18 +67,8 @@ fi
 
 if [ "$SUBSCRIPTION" == "" ]; then
     echo "Subscription not specified, the subscription is the default sub of the account."
-    SUBSCRIPTION=$(az account list --query [].id)
-    #Format subscription id
-    SUBSCRIPTION="${SUBSCRIPTION/]/}"
-    SUBSCRIPTION="${SUBSCRIPTION/[/}"
-    SUBSCRIPTION="${SUBSCRIPTION//\"/}"
-    SUBSCRIPTION="${SUBSCRIPTION// /}"
-    SUBSCRIPTION="${SUBSCRIPTION//\n/}"
+    SUBSCRIPTION=$(az account list --query "[?isDefault].id | [0]" -o tsv)
 fi
-
-#az account create --enrollment-account-name toto1 --offer-type 0003P --display-name toto1 --owner-object-id cab314e7-8f50-41b9-ad3c-75f31066ea98
-#az account set --name toto1
-
 
 #Set var with name input
 STORAGE_ACCOUNT_NAME=${NAME}staccount
@@ -86,7 +76,6 @@ CONTAINER_NAME=tfstate${STORAGE_ACCOUNT_NAME}
 
 export AZURE_extension_use_dynamic_install=yes_without_prompt
 user=$(az ad signed-in-user show --query userPrincipalName --output tsv)
-
 
 # Create Storage Account
 echo "Creating storage account : ${RESOURCE_GROUP_NAME}"
