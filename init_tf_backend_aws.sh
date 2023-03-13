@@ -23,7 +23,7 @@ Usage : $0 -n NAME [options]
 Mandatory arguments :
     -n NAME      Set the name of created resources.
 Available options :
-    -r REGION                   Specify the region in which to create the resources.
+    -r REGION                   Specify the region in which to create the resources (default $REGION).
     -p PREFIXED                 Whether to prefix the name with "<ACCOUNT ID>-tfstate-" (default $PREFIXED)
     -b BLOCK_PUBLIC_ACCESS      Whether to block public access for s3 bucket (default $BLOCK_PUBLIC_ACCESS)
     -y                          Execute script in non interactive mode.
