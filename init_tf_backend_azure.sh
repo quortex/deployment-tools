@@ -6,14 +6,13 @@
 #
 # Official documentation about terraform state in Azure Storage Account =>
 # https://developer.hashicorp.com/terraform/language/settings/backends/azurerm
-
 # Bash strict mode
 set -euo pipefail
-
 
 REGION=westeurope
 NAME=
 RESOURCE_GROUP_NAME=administration
+SUBSCRIPTION=
 
 function help() {
     cat <<EOF
@@ -29,7 +28,7 @@ Available options :
     -rg         The name of Ressource Group (default $RESOURCE_GROUP_NAME).
     -st         The name of Storage Account.
     -ct         The name of Container.
-    -h          Display this help.
+    -h           Display this help.
 EOF
 }
 
@@ -65,6 +64,22 @@ if [ "$NAME" == "" ]; then
     echo "Name was not specified, aborting !"
     exit 1
 fi
+
+if [ "$SUBSCRIPTION" == "" ]; then
+    echo "Subscription not specified, the subscription is the default sub of the account."
+    SUBSCRIPTION=$(az account list --query [].id)
+    #Format subscription id
+    SUBSCRIPTION="${SUBSCRIPTION/]/}"
+    SUBSCRIPTION="${SUBSCRIPTION/[/}"
+    SUBSCRIPTION="${SUBSCRIPTION//\"/}"
+    SUBSCRIPTION="${SUBSCRIPTION// /}"
+    SUBSCRIPTION="${SUBSCRIPTION//\n/}"
+fi
+
+#az account create --enrollment-account-name toto1 --offer-type 0003P --display-name toto1 --owner-object-id cab314e7-8f50-41b9-ad3c-75f31066ea98
+#az account set --name toto1
+
+
 #Set var with name input
 STORAGE_ACCOUNT_NAME=${NAME}staccount
 CONTAINER_NAME=tfstate${STORAGE_ACCOUNT_NAME}
@@ -72,7 +87,6 @@ CONTAINER_NAME=tfstate${STORAGE_ACCOUNT_NAME}
 export AZURE_extension_use_dynamic_install=yes_without_prompt
 user=$(az ad signed-in-user show --query userPrincipalName --output tsv)
 
-subid=$(az account subscription list --query [].subscriptionId)
 
 # Create Storage Account
 echo "Creating storage account : ${RESOURCE_GROUP_NAME}"
@@ -84,5 +98,3 @@ res=$(az storage container create --name $CONTAINER_NAME --account-name $STORAGE
 
 echo "storage_account_name: $STORAGE_ACCOUNT_NAME"
 echo "container_name: $CONTAINER_NAME"
-
-role=$(az role assignment create --assignee $user --role "Storage Blob Data Owner" --scope "/subscriptions/${SUBSCRIPTION}/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT_NAME")
