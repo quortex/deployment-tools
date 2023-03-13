@@ -1,11 +1,11 @@
 #!/bin/bash
 #
 # The purpose of this script is to provision the resources needed to store
-# terraform states on AWS. It will provision a bucket on Amazon S3 as well as a
-# Dynamo DB table to support state locking and consistency checking.
+# terraform states on AZURE. It will provision a container on Azure Storage account as well as a
+# container to support state locking and consistency checking.
 #
-# Official documentation about terraform state in S3 =>
-# https://www.terraform.io/language/settings/backends/s3
+# Official documentation about terraform state in Azure Storage Account =>
+# https://developer.hashicorp.com/terraform/language/settings/backends/azurerm
 
 REGION=westeurope
 NAME=
@@ -74,7 +74,7 @@ subid=$(az account subscription list --query [].subscriptionId)
 
 echo "Creating ressource group : ${RESOURCE_GROUP_NAME}"
 # Create Storage Account
-res=$(az storage account create --resource-group $RESOURCE_GROUP_NAME --name $STORAGE_ACCOUNT_NAME --sku Standard_LRS --encryption-services blob --allow-blob-public-acces)
+res=$(az storage account create --resource-group $RESOURCE_GROUP_NAME --name $STORAGE_ACCOUNT_NAME --sku Standard_LRS --encryption-services blob)
 
 echo "Creating Storage Account : ${RESOURCE_GROUP_NAME}"
 # Create Storage Account Container
@@ -83,8 +83,4 @@ res=$(az storage container create --name $CONTAINER_NAME --account-name $STORAGE
 echo "storage_account_name: $STORAGE_ACCOUNT_NAME"
 echo "container_name: $CONTAINER_NAME"
 
-echo $USER
-echo
-echo az role assignment create --assignee $user --role "Storage Blob Data Owner" --scope "/subscriptions/$SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT_NAME/blobServices/default/containers/$CONTAINER_NAME"
-
-user=$(az role assignment create --assignee $user --role "Storage Blob Data Owner" --scope "/subscriptions/${SUBSCRIPTION}/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT_NAME" )
+role=$(az role assignment create --assignee $user --role "Storage Blob Data Owner" --scope "/subscriptions/${SUBSCRIPTION}/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT_NAME")
