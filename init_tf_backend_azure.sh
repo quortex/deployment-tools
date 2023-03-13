@@ -7,10 +7,13 @@
 # Official documentation about terraform state in Azure Storage Account =>
 # https://developer.hashicorp.com/terraform/language/settings/backends/azurerm
 
+# Bash strict mode
+set -euo pipefail
+
+
 REGION=westeurope
 NAME=
 RESOURCE_GROUP_NAME=administration
-SUBSCRIPTION=
 
 function help() {
     cat <<EOF
@@ -21,12 +24,12 @@ Usage : $0 -n NAME [options]
 Mandatory arguments :
     -n NAME      Set the name of created resources.
 Available options :
-    -r          The name of the region.
+    -r          The name of the region (default $REGION).
     -s          The name of the subscription.
-    -rg         The name of Ressource Group.
+    -rg         The name of Ressource Group (default $RESOURCE_GROUP_NAME).
     -st         The name of Storage Account.
     -ct         The name of Container.
-    -h           Display this help.
+    -h          Display this help.
 EOF
 }
 
@@ -66,14 +69,13 @@ fi
 STORAGE_ACCOUNT_NAME=${NAME}staccount
 CONTAINER_NAME=tfstate${STORAGE_ACCOUNT_NAME}
 
-res=$(az config set extension.use_dynamic_install=yes_without_prompt)
+export AZURE_extension_use_dynamic_install=yes_without_prompt
 user=$(az ad signed-in-user show --query userPrincipalName --output tsv)
-subid=$(az account subscription list --query [].subscriptionId)
-#Create RG
-#res=$(az group create --name $RESOURCE_GROUP_NAME --location $REGION)
 
-echo "Creating ressource group : ${RESOURCE_GROUP_NAME}"
+subid=$(az account subscription list --query [].subscriptionId)
+
 # Create Storage Account
+echo "Creating storage account : ${RESOURCE_GROUP_NAME}"
 res=$(az storage account create --resource-group $RESOURCE_GROUP_NAME --name $STORAGE_ACCOUNT_NAME --sku Standard_LRS --encryption-services blob)
 
 echo "Creating Storage Account : ${RESOURCE_GROUP_NAME}"
