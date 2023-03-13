@@ -149,6 +149,31 @@ Available options :
 
 ---
 
+## init_tf_backend_azure
+
+Provision the resources needed to store terraform states on AZURE.
+
+A container on Azure Storage Account will be created. State locking is support by default.
+### Usage
+
+```
+Usage : ./init_tf_backend_azure.sh -n NAME [options]
+
+Mandatory arguments :
+    -n NAME      Set the name of created resources.
+Available options :
+    -r          The name of the region (default $REGION).
+    -s          The name of the subscription.
+    -rg         The name of Ressource Group (default $RESOURCE_GROUP_NAME).
+    -st         The name of Storage Account.
+    -ct         The name of Container.
+    -h           Display this help.
+
+
+If you have probleme with write access of state, go to portal.azure.com and assign you the rights "Storage Blob Data Owner" to the subscription or on the storage account.
+
+---
+
 ## get_cluster_config
 
 Compute a cluster Config from a given ServiceAccount.
