@@ -6,7 +6,7 @@ OVERPROVISIONER_NAMESPACE=cluster-overprovisioner
 OVERPROVISIONER_DEPLOYMENT=cluster-overprovisioner-captures-overprovisioner
 CAPTURE_NAMESPACE=reference
 CAPTURE_IMAGE=$(
-  kubectl -n "${CAPTURE_NAMESPACE}" get deployments \
+  kubectl -n "${CAPTURE_NAMESPACE}" get pod \
     --selector app.kubernetes.io/name=capture \
     -o jsonpath='{.items[*].spec.containers[*].image}' |
     tr -s '[[:space:]]' '\n' | sort | uniq | head -n 1
