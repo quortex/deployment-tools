@@ -154,6 +154,7 @@ Available options :
 Provision the resources needed to store terraform states on AZURE.
 
 A container on Azure Storage Account will be created. State locking is support by default.
+
 ### Usage
 
 ```
@@ -168,7 +169,7 @@ Available options :
     -st         The name of Storage Account.
     -ct         The name of Container.
     -h           Display this help.
-
+```
 
 If you have probleme with write access of state, go to portal.azure.com and assign you the rights "Storage Blob Data Owner" to the subscription or on the storage account.
 
@@ -191,4 +192,26 @@ Available options :
     -n NAMESPACE      The namespace of the ServiceAccount to use for the config. (default ${NAMESPACE}).
     -c CLUSTER_NAME   Set the name of the cluster (default ${CLUSTER_NAME}).
     -h                Display this help.
+```
+
+---
+
+## saml2aws_generate_config
+
+This script is based on [saml2aws](https://github.com/Versent/saml2aws) in order to list the available roles and automatically generate a config for aws cli containing the profiles matching the different accounts / roles.
+
+Generated profiles are configured to source credentials from saml2aws automatically (see [Sourcing credentials with an external process](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html)).
+
+### Usage
+
+Display the config :
+
+```
+./saml2aws_generate_config.sh
+```
+
+Overwrite your current AWS cli config:
+
+```
+./saml2aws_generate_config.sh ~/.aws/config
 ```
