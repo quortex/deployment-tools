@@ -10,7 +10,6 @@
 set -euo pipefail
 
 RESOURCE_GROUP_NAME=administration
-SUBSCRIPTION=
 
 function help() {
     cat <<EOF
@@ -22,9 +21,8 @@ Mandatory arguments :
     -a         The name of Storage Account.
     -c         The name of Storage Container.
 Available options :
-    -s          The name of the subscription.
     -r         The name of Ressource Group (default $RESOURCE_GROUP_NAME).
-    -h           Display this help.
+    -h         Display this help.
 EOF
 }
 
@@ -43,9 +41,6 @@ while getopts "h:r:a:c:s" opt; do
     c)
         CONTAINER_NAME=$OPTARG
         ;;
-    s)
-        SUBSCRIPTION=$OPTARG
-        ;;
     *)
         echo "Unsupported flag provided : ${OPTARG}".
         help
@@ -59,12 +54,7 @@ if [ "$NAME" == "" ]; then
     exit 1
 fi
 
-if [ "$SUBSCRIPTION" == "" ]; then
-    echo "Subscription not specified, the subscription is the default sub of the account."
-    SUBSCRIPTION=$(az account list --query "[?isDefault].id | [0]" -o tsv)
-fi
-
-export AZURE_extension_use_dynamic_install=yes_without_prompt
+export AZURE_EXTENSION_USE_DYNAMIC_INSTALL=yes_without_prompt
 
 # Create Storage Account
 echo "Creating storage account : ${STORAGE_ACCOUNT_NAME}"
