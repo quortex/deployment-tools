@@ -11,6 +11,8 @@ CAPTURE_IMAGE=$(
     -o jsonpath='{.items[*].spec.containers[*].image}' |
     tr -s '[[:space:]]' '\n' | sort | uniq | head -n 1
 )
+DISABLERECONCILIATION=false
+INPUTSVERSION=
 
 # Colors
 end="\033[0m"
@@ -30,6 +32,39 @@ purple="\033[0;35m"
 purpleb="\033[1;35m"
 lightblue="\033[0;36m"
 lightblueb="\033[1;36m"
+
+
+function help() {
+    cat <<EOF
+Rollout the Capture nodes.
+Usage : $0 [options]
+
+Available options :
+    -d         Disable reconcoiliation on the captures (Default false)
+    -v         Set the version of the inputs to the given version (/!\ WARNING: changing the input version triggers the restart of captures and units leading to a downtime)
+    -h         Display this help.
+EOF
+}
+
+while getopts "v:dh" opt; do
+    case "$opt" in
+    h)
+        help
+        exit 0
+        ;;
+    d)
+        DISABLERECONCILIATION=true
+        ;;
+    v)
+        INPUTSVERSION=$OPTARG
+        ;;
+    *)
+        echo "Unsupported flag provided : ${opt}".
+        help
+        exit 1
+        ;;
+    esac
+done
 
 function green {
   echo -e "${green}${1}${end}"
@@ -68,6 +103,12 @@ function drain {
   yellow "Draining ${1}"
   kubectl drain "${1}" --ignore-daemonsets=true --delete-emptydir-data=true --timeout=120s --skip-wait-for-delete-timeout=1
   green "${1} successfully drained."
+}
+
+function disableCaptureReconciliation {
+  green "Set Capture ${1} disableReconciliation to ${2}"
+  kubectl -n "${CAPTURE_NAMESPACE}" patch captures.core.quortex.io ${1}  --type=json \
+   -p "[{\"op\": \"replace\", \"path\": \"/spec/disableReconciliation\", \"value\": ${2}}]"
 }
 
 function releaseip {
@@ -147,6 +188,10 @@ whiteb "Kube context                       : $(kubectl config current-context)"
 whiteb "Capture overprovisioner deployment : ${OVERPROVISIONER_DEPLOYMENT}"
 whiteb "Capture overprovisioner namespace  : ${OVERPROVISIONER_NAMESPACE}"
 whiteb "Most used capture image            : ${CAPTURE_IMAGE}"
+whiteb "Disable captures reconciliation    : ${DISABLERECONCILIATION}"
+if [ "$INPUTSVERSION" != "" ]; then
+  whiteb "Set inputs version to              : ${INPUTSVERSION} ${yellowb}/!\ WARNING: changing the input version triggers the restart of captures and units leading to a downtime${end}"
+fi
 echo -n "Continue? y/n "
 read -r answer
 
@@ -189,6 +234,29 @@ green "Wait for capture overprovisioners to be rescheduled and ready"
 kubectl -n "${OVERPROVISIONER_NAMESPACE}" wait pod --for=condition=ready --timeout=10m \
   --selector "app.cluster-overprovisioner/deployment=captures-overprovisioner"
 
+if [ $DISABLERECONCILIATION == true ]; then
+  captures=$(
+    kubectl -n "${CAPTURE_NAMESPACE}" get capture -o jsonpath="{.items[*]['metadata.name']}"
+  )
+  yellow "Setting all Captures disableReconciliation to true"
+  for capture in ${captures}; do
+    # Disable capture reconciliation
+    disableCaptureReconciliation $capture true
+  done
+  # Disable quortex-operator legacy mode of reconciling mongo addresses to non-FQDN addresses
+  kubectl -n quortex-operator-system set env deployment/quortex-operator LEGACY_NON_FQDN_MONGO_DB_ADDRESSES-
+fi
+
+if [ "$INPUTSVERSION" != "" ]; then
+  yellow "Setting inputs version to ${INPUTSVERSION}"
+  inputs=$(
+    kubectl  get input -o jsonpath="{.items[*]['metadata.name']}"
+  )
+  for input in ${inputs}; do
+    kubectl label input $input input.ott.quortex.io/version=$INPUTSVERSION --overwrite
+  done
+fi
+
 for node in ${nodes_to_rollout}; do
   # Get some info about the cluster state
   capture_pods=$(
@@ -222,11 +290,25 @@ for node in ${nodes_to_rollout}; do
   releaseip "${node}"
   yellow "==> Release EIP from capture node took $(($(now) - start_downtime))s."
 
-  stamp=$(now)
-  for pod in ${capture_pods}; do
-    kubectl -n "${CAPTURE_NAMESPACE}" delete pod --force=true "${pod}"
-  done
-  yellow "==> Force deleted ${capture_pods} in $(($(now) - stamp))s."
+  if [ $DISABLERECONCILIATION == true ]; then
+   # Captures on this node
+    captures=$(
+      kubectl get pods -A \
+        --selector app.kubernetes.io/name=capture \
+        --field-selector "spec.nodeName=${node}" \
+        -o jsonpath="{.items[*]['metadata.labels.operator\.quortex\.io/workload-name']}"
+    )
+    for capture in ${captures}; do
+      # Enable capture reconciliation
+      disableCaptureReconciliation $capture false
+    done
+  else
+    stamp=$(now)
+    for pod in ${capture_pods}; do
+      kubectl -n "${CAPTURE_NAMESPACE}" delete pod --force=true "${pod}"
+    done
+    yellow "==> Force deleted ${capture_pods} in $(($(now) - stamp))s."
+  fi
 
   stamp=$(now)
   releaseip "${overprovisioner_node}"
@@ -238,16 +320,9 @@ for node in ${nodes_to_rollout}; do
 
   # wait for capture pods to be scheduled on new node
   stamp=$(now)
-  pending_capture_pods=$(
-    kubectl -n "${CAPTURE_NAMESPACE}" get pods \
-      --selector app.kubernetes.io/name=capture \
-      --field-selector status.phase!=Running \
-      -o jsonpath="{.items[*]['metadata.name']}"
-  )
-  for pod in ${pending_capture_pods}; do
-    green "Waiting for ${pod} to be scheduled..."
-    kubectl -n "${CAPTURE_NAMESPACE}" wait pod "${pod}" \
-      --for=condition=ready --timeout=5m
+  for deploy in ${captures}; do
+    green "Waiting for ${deploy} to be ready..."
+    kubectl -n "${CAPTURE_NAMESPACE}" rollout status deploy "${deploy}-capture" --timeout=5m
   done
   end_downtime=$(now)
 
