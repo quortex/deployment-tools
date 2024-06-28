@@ -2,7 +2,7 @@ FROM debian:buster
 
 ARG AWSCLI_VERSION=1.25.38
 ARG AZURECLI_VERSION=2.17.1
-ARG CLOUD_SDK_VERSION=336.0.0
+ARG CLOUD_CLI_VERSION=482.0.0
 ARG HELM_VERSION=v3.12.1
 ARG HELM_DIFF_VERSION=v3.4.2
 ARG ISTIOCTL_VERSION=1.16.1
@@ -35,7 +35,8 @@ RUN apt-get update && apt-get install -y \
 # Google Cloud SDK install
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
-  apt-get update && apt-get install -y google-cloud-sdk=${CLOUD_SDK_VERSION}-0
+  apt-get update && apt-get install -y google-cloud-cli=${CLOUD_CLI_VERSION}-0
+RUN apt-get install google-cloud-cli-gke-gcloud-auth-plugin
 
 # Update pip
 RUN pip3 install --upgrade pip
