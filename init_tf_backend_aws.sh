@@ -11,6 +11,7 @@ REGION=eu-west-1
 NAME=
 PREFIXED=true
 BLOCK_PUBLIC_ACCESS=true
+CREATE_DYNAMODB=false
 INTERACTIVE=true
 
 function help() {
@@ -26,12 +27,13 @@ Available options :
     -r REGION                   Specify the region in which to create the resources (default $REGION).
     -p PREFIXED                 Whether to prefix the name with "<ACCOUNT ID>-tfstate-" (default $PREFIXED)
     -b BLOCK_PUBLIC_ACCESS      Whether to block public access for s3 bucket (default $BLOCK_PUBLIC_ACCESS)
+    -d CREATE_DYNAMODB          Whether to create the DynamoDB table (default $CREATE_DYNAMODB)
     -y                          Execute script in non interactive mode.
     -h                          Display this help.
 EOF
 }
 
-while getopts "n:r:p:yh" opt; do
+while getopts "n:r:p:d:yh" opt; do
     case "$opt" in
     h)
         help
@@ -45,6 +47,9 @@ while getopts "n:r:p:yh" opt; do
         ;;
     p)
         PREFIXED=$OPTARG
+        ;;
+    d)
+        CREATE_DYNAMODB=$OPTARG
         ;;
     y)
         INTERACTIVE=false
@@ -62,7 +67,7 @@ if [ "$PREFIXED" == true ]; then
 fi
 
 if [ "$INTERACTIVE" == true ]; then
-    echo "This will create an s3 bucket and a dynamodb table named $NAME"
+    echo "This will create an s3 bucket and optionally a DynamoDB table named $NAME"
     echo "In region $REGION"
     echo ""
     read -p "Continue (y/n)?" CONT
@@ -103,22 +108,23 @@ if [ "$BLOCK_PUBLIC_ACCESS" == true ]; then
     --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 fi
 
-
 # Management of the creation of the DynamoDB table.
 #
-echo "Creating DynamoDB table : ${NAME}"
-res=$(aws dynamodb create-table --table-name ${NAME} \
-  --region ${REGION} \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST 2>&1)
+if [ "$CREATE_DYNAMODB" == true ]; then
+    echo "Creating DynamoDB table : ${NAME}"
+    res=$(aws dynamodb create-table --table-name ${NAME} \
+      --region ${REGION} \
+      --attribute-definitions AttributeName=LockID,AttributeType=S \
+      --key-schema AttributeName=LockID,KeyType=HASH \
+      --billing-mode PAY_PER_REQUEST 2>&1)
 
-case $res in
-  *"ResourceInUseException"*)
-    echo "DynamoDB table already owned !"
-    ;;
-  \S)
-    echo ${res}
-    exit 1
-    ;;
-esac
+    case $res in
+      *"ResourceInUseException"*)
+        echo "DynamoDB table already owned !"
+        ;;
+      \S)
+        echo ${res}
+        exit 1
+        ;;
+    esac
+fi
