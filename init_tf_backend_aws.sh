@@ -12,6 +12,7 @@ NAME=
 PREFIXED=true
 BLOCK_PUBLIC_ACCESS=true
 CREATE_DYNAMODB=false
+ENABLE_VERSIONING=true
 INTERACTIVE=true
 
 function help() {
@@ -28,12 +29,13 @@ Available options :
     -p PREFIXED                 Whether to prefix the name with "<ACCOUNT ID>-tfstate-" (default $PREFIXED)
     -b BLOCK_PUBLIC_ACCESS      Whether to block public access for s3 bucket (default $BLOCK_PUBLIC_ACCESS)
     -d CREATE_DYNAMODB          Whether to create the DynamoDB table (default $CREATE_DYNAMODB)
+    -v ENABLE_VERSIONING        Whether to enable bucket versioning (default $ENABLE_VERSIONING)
     -y                          Execute script in non interactive mode.
     -h                          Display this help.
 EOF
 }
 
-while getopts "n:r:p:d:yh" opt; do
+while getopts "n:r:p:d:v:yh" opt; do
     case "$opt" in
     h)
         help
@@ -51,8 +53,16 @@ while getopts "n:r:p:d:yh" opt; do
     d)
         CREATE_DYNAMODB=$OPTARG
         ;;
+    v)
+        ENABLE_VERSIONING=$OPTARG
+        ;;
     y)
         INTERACTIVE=false
+        ;;
+    *)
+        echo "Invalid option: -$OPTARG" >&2
+        help
+        exit 1
         ;;
     esac
 done
@@ -106,6 +116,15 @@ if [ "$BLOCK_PUBLIC_ACCESS" == true ]; then
     aws s3api put-public-access-block --bucket ${NAME} \
     --region ${REGION} \
     --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+fi
+
+# Management of the bucket versioning.
+#
+if [ "$ENABLE_VERSIONING" == true ]; then
+    echo "Enabling bucket versioning : ${NAME}"
+    aws s3api put-bucket-versioning \
+        --bucket ${NAME} \
+        --versioning-configuration Status=Enabled
 fi
 
 # Management of the creation of the DynamoDB table.
