@@ -166,33 +166,33 @@ function add_config() {
     local exi=$2
     local url=$3
     exi_main=$exi
-    num_new=$(echo $new | jq length)
+    num_new=$(echo "$new" | jq length)
 
     for n in $(seq 0 $(($num_new - 1))); do
-        new_conf=$(echo $new | jq .[$n])
-        new_uuid=$(echo $new_conf | jq -r .uuid)
-        new_conf=$(echo $new_conf | jq "$REMUUID_FUNCTION")
+        new_conf=$(echo "$new" | jq .[$n])
+        new_uuid=$(echo "$new_conf" | jq -r .uuid)
+        new_conf=$(echo "$new_conf" | jq "$REMUUID_FUNCTION")
 
-        new_md5="$(echo $new_conf | md5sum)"
-        new_name="$(echo $new_conf | jq -r .name)"
-        new_location="$(echo $new_conf | jq .location)"
-        new_regex="$(echo $new_conf | jq .regex)"
+        new_md5="$(echo "$new_conf" | md5sum)"
+        new_name="$(echo "$new_conf" | jq -r .name)"
+        new_location="$(echo "$new_conf" | jq .location)"
+        new_regex="$(echo "$new_conf" | jq .regex)"
 
         exi=$exi_main
-        num_exi=$(echo $exi | jq length)
+        num_exi=$(echo "$exi" | jq length)
 
         action="post"
         exi_conf=""
 
         for e in $(seq 0 $(($num_exi - 1))); do
-            exi_conf=$(echo $exi | jq .[$e])
-            exi_uuid=$(echo $exi_conf | jq -r .uuid)
-            exi_conf=$(echo $exi_conf | jq "$REMUUID_FUNCTION")
+            exi_conf=$(echo "$exi" | jq .[$e])
+            exi_uuid=$(echo "$exi_conf" | jq -r .uuid)
+            exi_conf=$(echo "$exi_conf" | jq "$REMUUID_FUNCTION")
 
-            exi_md5="$(echo $exi_conf | md5sum)"
-            exi_name=$(echo $exi_conf | jq -r .name)
-            exi_location=$(echo $exi_conf | jq .location)
-            exi_regex=$(echo $exi_conf | jq .regex)
+            exi_md5="$(echo "$exi_conf" | md5sum)"
+            exi_name=$(echo "$exi_conf" | jq -r .name)
+            exi_location=$(echo "$exi_conf" | jq .location)
+            exi_regex=$(echo "$exi_conf" | jq .regex)
 
             # If the conf are bit identical, obvisouly do nothing!
             if [ "$new_md5" == "$exi_md5" ]; then
@@ -229,42 +229,42 @@ function add_config() {
             if [ "$exi_conf" != "" ]; then
                 # Remove this entry from existinf conf to speed up the processing
                 if [ "$exi_name" != "null" ]; then
-                    exi_main=$(echo $exi_main | jq ". | del(.[] | select(.name==\"$exi_name\"))")
+                    exi_main=$(echo "$exi_main" | jq ". | del(.[] | select(.name==\"$exi_name\"))")
                 fi
                 if [ "$exi_location" != "null" ]; then
-                    exi_main=$(echo $exi_main | jq ". | del(.[] | select(.location==$exi_location))")
+                    exi_main=$(echo "$exi_main" | jq ". | del(.[] | select(.location==$exi_location))")
                 fi
                 if [ "$exi_regex" != "null" ]; then
-                    exi_main=$(echo $exi_main | jq ". | del(.[] | select(.regex==$exi_regex))")
+                    exi_main=$(echo "$exi_main" | jq ". | del(.[] | select(.regex==$exi_regex))")
                 fi
                 if [ "$exi_uuid" != "null" ]; then
-                    exi_main=$(echo $exi_main | jq ". | del(.[] | select(.uuid==\"$exi_uuid\"))")
+                    exi_main=$(echo "$exi_main" | jq ". | del(.[] | select(.uuid==\"$exi_uuid\"))")
                 fi
             fi
         fi
 
         if [ "$action" == "post" ]; then
             tmp=$(mktemp)
-            echo $new_conf >$tmp
+            printf '%s' "$new_conf" >"$tmp"
             printf "+"
-            $VERBOSE && printf "\nWill post $(echo new_conf | jq .)"
-            $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X POST -H "Content-Type: application/json" "${url}" -d@$tmp
-            rm $tmp
+            $VERBOSE && printf "\nWill post %s" "$(echo "$new_conf" | jq .)"
+            $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X POST -H "Content-Type: application/json" "${url}" -d@"$tmp"
+            rm "$tmp"
         elif [ "$action" == "put" ]; then
             tmp=$(mktemp)
             # Use name if exists, or uuid if exists
             if [ "$exi_uuid" != "null" ]; then
-                echo $new_conf | jq ". += {\"uuid\":\"$exi_uuid\"}" >$tmp
-                $VERBOSE && printf "\nWill put $(echo $new_conf | jq .)"
-                $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X PUT -H "Content-Type: application/json" "${url}/${exi_uuid}" -d@$tmp
+                echo "$new_conf" | jq ". += {\"uuid\":\"$exi_uuid\"}" >"$tmp"
+                $VERBOSE && printf "\nWill put %s" "$(echo "$new_conf" | jq .)"
+                $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X PUT -H "Content-Type: application/json" "${url}/${exi_uuid}" -d@"$tmp"
             elif [ "$exi_name" != "null" ]; then
-                echo $new_conf >$tmp
-                $VERBOSE && printf "\nWill put $(echo $new_conf | jq .)"
-                $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X PUT -H "Content-Type: application/json" "${url}/${exi_name}" -d@$tmp
+                printf '%s' "$new_conf" >"$tmp"
+                $VERBOSE && printf "\nWill put %s" "$(echo "$new_conf" | jq .)"
+                $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X PUT -H "Content-Type: application/json" "${url}/${exi_name}" -d@"$tmp"
             else
                 echo "WTF"
             fi
-            rm $tmp
+            rm "$tmp"
             printf "*"
         else
             $VERBOSE && printf "\nNot touching $(echo $exi_conf | jq .)"
@@ -344,28 +344,28 @@ function delete_config() {
         if [ "$action" == "idle" ] && [ "$new_conf" != "" ]; then
             # Remove this entry from existing conf to speed up the processing
             if [ "$new_name" != "null" ]; then
-                new_main=$(echo $new_main | jq ". | del(.[] | select(.name==\"$new_name\"))")
+                new_main=$(echo "$new_main" | jq ". | del(.[] | select(.name==\"$new_name\"))")
             fi
             if [ "$new_location" != "null" ]; then
-                new_main=$(echo $new_main | jq ". | del(.[] | select(.location==$new_location))")
+                new_main=$(echo "$new_main" | jq ". | del(.[] | select(.location==$new_location))")
             fi
             if [ "$new_regex" != "null" ]; then
-                new_main=$(echo $new_main | jq ". | del(.[] | select(.regex==$new_regex))")
+                new_main=$(echo "$new_main" | jq ". | del(.[] | select(.regex==$new_regex))")
             fi
         fi
         if [ "$action" == "delete" ]; then
             printf "-"
             if [ "$exi_uuid" != "null" ]; then
-                $VERBOSE && printf "\nDeleting $(echo $exi_conf | jq .)"
+                $VERBOSE && printf "\nDeleting %s" "$(echo "$exi_conf" | jq .)"
                 $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X DELETE "${url}/${exi_uuid}"
             elif [ "$exi_name" != "null" ]; then
-                $VERBOSE && printf "\nDeleting $(echo $exi_conf | jq .)"
+                $VERBOSE && printf "\nDeleting %s" "$(echo "$exi_conf" | jq .)"
                 $NO_DRY_RUN && curl $CURL_AUTH_ARGUMENTS $CURL_COMMON_ARGUMENTS -X DELETE "${url}/${exi_name}"
             else
                 echo "Unhandled Error : delete action without uuid or name."
             fi
         else
-            $VERBOSE && printf "\nNot touching $(echo $exi_conf | jq .)"
+            $VERBOSE && printf "\nNot touching %s" "$(echo "$exi_conf" | jq .)"
             printf "."
         fi
     done
@@ -421,7 +421,7 @@ function update_configuration() {
         printf "Updating $service"
         while [ TRUE ]; do
             # Read configuration
-            config=$(eval "envsubst <$configfile '"$VARS"' | jq .[$i]")
+            config=$(envsubst "$VARS" <"$configfile" | jq .[$i])
             if [ "$config" == "null" ]; then
                 break
             elif [ -z "$config" ]; then
@@ -434,11 +434,11 @@ function update_configuration() {
             fi
 
             # Retreive and compose path
-            path=$(echo $config | jq -r .url)
+            path=$(echo "$config" | jq -r .url)
             full_url="$base_url$path"
 
             # Get new confs
-            new_confs=$(echo $config | jq .confs | jq -S .)
+            new_confs=$(echo "$config" | jq .confs | jq -S .)
 
             # Get existing confs
             tmp=$(mktemp)

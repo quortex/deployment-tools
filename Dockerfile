@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM debian:trixie
 
 ARG AWSCLI_VERSION=1.25.38
 ARG AZURECLI_VERSION=2.17.1
