@@ -89,25 +89,28 @@ fi
 
 # Management of the creation of the s3 bucket.
 #
-res=$(aws s3api create-bucket --bucket ${NAME} \
-  --region ${REGION} \
-  --create-bucket-configuration LocationConstraint=${REGION} \
-  --acl private 2>&1)
-
 echo "Creating bucket : ${NAME}"
-case $res in
-  *"BucketAlreadyOwnedByYou"*)
-    echo "Bucket already owned !"
-    ;;
-  *"BucketAlreadyExists"*)
-    echo "Bucket already exists !"
-    exit 1
-    ;;
-  \S)
-    echo ${res}
-    exit 1
-    ;;
-esac
+res=$(aws s3api create-bucket --bucket ${NAME} \
+	--region ${REGION} \
+	--create-bucket-configuration LocationConstraint=${REGION} \
+	--acl private 2>&1)
+if [ $? -ne 0 ]; then
+	case $res in
+	*"BucketAlreadyOwnedByYou"*)
+		echo "Bucket already owned !"
+		;;
+	*"BucketAlreadyExists"*)
+		echo "Bucket already exists !"
+		exit 1
+		;;
+	*)
+		echo "Error: ${res}"
+		exit 1
+		;;
+	esac
+else
+	echo "Bucket created successfully !"
+fi
 
 # Management of the bucket public access block configuration.
 #
@@ -137,13 +140,18 @@ if [ "$CREATE_DYNAMODB" == true ]; then
       --key-schema AttributeName=LockID,KeyType=HASH \
       --billing-mode PAY_PER_REQUEST 2>&1)
 
-    case $res in
-      *"ResourceInUseException"*)
-        echo "DynamoDB table already owned !"
-        ;;
-      \S)
-        echo ${res}
-        exit 1
-        ;;
-    esac
+    if [ $? -ne 0 ]; then
+        case $res in
+        *"ResourceInUseException"*)
+            echo "DynamoDB table already owned !"
+            exit 1
+            ;;
+        *)
+            echo "Error: ${res}"
+            exit 1
+            ;;
+        esac
+    else
+        echo "Bucket created successfully !"
+    fi
 fi
