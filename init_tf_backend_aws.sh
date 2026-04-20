@@ -77,14 +77,16 @@ if [ "$PREFIXED" == true ]; then
 fi
 
 if [ "$INTERACTIVE" == true ]; then
-    echo "This will create an s3 bucket and optionally a DynamoDB table named $NAME"
-    echo "In region $REGION"
-    echo ""
-    read -p "Continue (y/n)?" CONT
-    if [ "$CONT" != "y" ]; then
-        echo "Aborting !";
-        exit 0
+    PLAN="This will create a S3 bucket"
+    if [ "$CREATE_DYNAMODB" == true ]; then
+        PLAN="$PLAN and a DynamoDB table"
     fi
+	echo "$PLAN named ${NAME} in region ${REGION}."
+	read -p "Continue (y/n)?" CONT
+	if [ "$CONT" != "y" ]; then
+		echo "Aborting !"
+		exit 0
+	fi
 fi
 
 # Management of the creation of the s3 bucket.
