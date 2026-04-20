@@ -149,7 +149,5 @@ if [ "$CREATE_DYNAMODB" == true ]; then
             exit 1
             ;;
         esac
-    else
-        echo "Bucket created successfully !"
     fi
 fi
