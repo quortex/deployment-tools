@@ -108,8 +108,6 @@ if [ $? -ne 0 ]; then
 		exit 1
 		;;
 	esac
-else
-	echo "Bucket created successfully !"
 fi
 
 # Management of the bucket public access block configuration.
