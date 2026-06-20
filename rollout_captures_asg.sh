@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-OVERPROVISIONER_NAMESPACE=cluster-overprovisioner
-OVERPROVISIONER_DEPLOYMENT=cluster-overprovisioner-captures-overprovisioner
-CAPTURE_NAMESPACE=reference
+OVERPROVISIONER_NAMESPACE=capture-overprovisioner-system
+OVERPROVISIONER_DEPLOYMENT=capture-overprovisioner
+CAPTURE_NAMESPACE=quortex-ingest-0
 CAPTURE_IMAGE=$(
   kubectl -n "${CAPTURE_NAMESPACE}" get pod \
     --selector app.kubernetes.io/name=capture \
@@ -102,12 +102,84 @@ function check_capture_status {
   echo -e "${green}Ok${end}"
 }
 
+function create_overprovisioner {
+    echo -n "Creating a temporary overprovisioner"
+    kubectl create ns ${OVERPROVISIONER_NAMESPACE} -o yaml --dry-run=client | kubectl apply -f -
+    kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "${OVERPROVISIONER_DEPLOYMENT}"
+  namespace: "${OVERPROVISIONER_NAMESPACE}
+  labels:
+    app: "${OVERPROVISIONER_DEPLOYMENT}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "${OVERPROVISIONER_DEPLOYMENT}"
+  template:
+    metadata:
+      labels:
+        app: "${OVERPROVISIONER_DEPLOYMENT}"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - capture-overpro
+            topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                  - key: karpenter.sh/nodepool
+                    operator: In
+                    values:
+                      - kubestatic-public
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                      - on-demand
+      containers:
+      - name: capture
+        image: "${CAPTURE_IMAGE}"
+      tolerations:
+      - effect: NoSchedule
+        key: quortex.io/kubestatic-public-nodes
+        operator: Equal
+        value: dedicated
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 300
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 300
+EOF
+    kubectl rollout status deployment/${OVERPROVISIONER_DEPLOYMENT} -n ${OVERPROVISIONER_NAMESPACE}
+}
+
+function delete_overprovisioner {
+    kubectl delete deployment ${OVERPROVISIONER_DEPLOYMENT} -n ${OVERPROVISIONER_NAMESPACE}
+    kubectl delete ns ${OVERPROVISIONER_NAMESPACE}
+}
+
 function check_overprovisioner_status {
   echo -n "Checking that all captures-overprovisioner pods are running... "
   local pending_pods_count
   pending_pods_count=$(
     kubectl -n "${OVERPROVISIONER_NAMESPACE}" get pods \
-      --selector app.cluster-overprovisioner/deployment=captures-overprovisioner \
+      --selector app="${OVERPROVISIONER_DEPLOYMENT}" \
       --field-selector status.phase!=Running -o name | wc -w
   )
   if [ "${pending_pods_count}" -ne 0 ]; then
@@ -138,6 +210,7 @@ function now {
 [[ ! $(which kubectl) ]] && fail_and_exit "kubectl CLI not found"
 
 check_capture_status
+create_overprovisioner    
 check_overprovisioner_status
 check_overprovisioner_image
 white "Note that unschedulable capture nodes will be ignored."
@@ -259,3 +332,5 @@ for node in ${nodes_to_rollout}; do
     --for=condition=ready --timeout=10m \
     --selector "app.cluster-overprovisioner/deployment=captures-overprovisioner"
 done
+
+delete_overprovisioner
